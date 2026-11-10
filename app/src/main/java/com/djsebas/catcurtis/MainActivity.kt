@@ -77,6 +77,7 @@ private fun EditorScreen() {
  var status by remember { mutableStateOf("Importa videos, fotos o música para comenzar") }
  var titleText by remember { mutableStateOf("") }
  var filterMode by remember { mutableStateOf("Original") }
+ var previewVolume by remember { mutableFloatStateOf(1f) }
  var exporting by remember { mutableStateOf(false) }
  val worker = remember { Executors.newSingleThreadExecutor() }
  val mainHandler = remember { Handler(Looper.getMainLooper()) }
@@ -97,6 +98,7 @@ private fun EditorScreen() {
   status = if (uris.isEmpty()) "No se seleccionaron archivos" else "${uris.size} archivo(s) agregados"
  }
  val player = remember { ExoPlayer.Builder(context).build() }
+ LaunchedEffect(previewVolume) { player.volume = previewVolume }
  LaunchedEffect(selected, trimStart, trimEnd) {
   selected?.takeIf { it.kind == "VIDEO" }?.let { clip ->
    val start = trimStart.toLong().coerceAtLeast(0L)
@@ -232,6 +234,9 @@ private fun EditorScreen() {
     )
    }
   }
+  Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Text("VOLUMEN DE VISTA PREVIA", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp); Spacer(Modifier.weight(1f)); Text("${(previewVolume * 100).toInt()}%", color = Accent, fontSize = 11.sp) }
+  Slider(value = previewVolume, onValueChange = { previewVolume = it }, valueRange = 0f..1f, modifier = Modifier.fillMaxWidth())
+  Text("Este control ajusta el sonido al reproducir; no modifica el volumen del archivo exportado.", color = Color.Gray, fontSize = 9.sp)
   Text("TÍTULO SOBRE EL VIDEO", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
   OutlinedTextField(
    value = titleText,
