@@ -48,7 +48,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.C
 import androidx.media3.common.OverlaySettings
 import androidx.media3.common.VideoCompositorSettings
-import androidx.media3.common.util.Size
+import androidx.media3.common.util.Size as Media3Size
 import androidx.media3.common.audio.ChannelMixingAudioProcessor
 import androidx.media3.common.audio.ChannelMixingMatrix
 import androidx.media3.common.util.UnstableApi
@@ -303,7 +303,7 @@ private fun EditorScreen() {
    EditedMediaItemSequence.Builder(audioItem).setIsLooping(true).build()
   }
   val compositorSettings = object : VideoCompositorSettings {
-   override fun getOutputSize(inputSizes: List<Size>): Size = inputSizes.first()
+   override fun getOutputSize(inputSizes: List<Media3Size>): Media3Size = inputSizes.first()
    override fun getOverlaySettings(inputId: Int, presentationTimeUs: Long): OverlaySettings {
     val timing = clipTimings.getOrNull(inputId) ?: return object : OverlaySettings {}
     val fadeIn = if (timing.fadeInMs > 0L) {
