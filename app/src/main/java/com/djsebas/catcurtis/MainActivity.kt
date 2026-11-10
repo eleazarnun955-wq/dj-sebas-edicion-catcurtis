@@ -73,6 +73,8 @@ class MainActivity : ComponentActivity() {
 private fun EditorScreen() {
  val context = LocalContext.current
  val clips = remember { mutableStateListOf<Clip>() }
+ val undoHistory = remember { mutableStateListOf<List<Clip>>() }
+ val redoHistory = remember { mutableStateListOf<List<Clip>>() }
  var selected by remember { mutableStateOf<Clip?>(null) }
  var trimStart by remember { mutableFloatStateOf(0f) }
  var trimEnd by remember { mutableFloatStateOf(1f) }
@@ -84,7 +86,39 @@ private fun EditorScreen() {
  var exporting by remember { mutableStateOf(false) }
  val worker = remember { Executors.newSingleThreadExecutor() }
  val mainHandler = remember { Handler(Looper.getMainLooper()) }
+
+ // Historial de cambios de la línea de tiempo (máximo 30 pasos).
+ fun saveTimelineState() {
+  undoHistory.add(clips.toList())
+  if (undoHistory.size > 30) undoHistory.removeAt(0)
+  redoHistory.clear()
+ }
+ fun restoreTimeline(items: List<Clip>) {
+  clips.clear()
+  clips.addAll(items)
+  selected = selected?.let { current -> clips.firstOrNull { it.uri == current.uri } }
+   ?: clips.firstOrNull { it.kind == "VIDEO" }
+  trimStart = 0f
+  trimEnd = selected?.durationMs?.coerceAtLeast(1L)?.toFloat() ?: 1f
+ }
+ fun undoTimeline() {
+  if (undoHistory.isNotEmpty()) {
+   redoHistory.add(clips.toList())
+   val previous = undoHistory.removeAt(undoHistory.lastIndex)
+   restoreTimeline(previous)
+   status = "Último cambio de la línea de tiempo deshecho"
+  }
+ }
+ fun redoTimeline() {
+  if (redoHistory.isNotEmpty()) {
+   undoHistory.add(clips.toList())
+   val next = redoHistory.removeAt(redoHistory.lastIndex)
+   restoreTimeline(next)
+   status = "Cambio de la línea de tiempo restaurado"
+  }
+ }
  val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+  if (uris.isNotEmpty()) saveTimelineState()
   uris.forEach { uri ->
    runCatching { context.contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }
    val mime = context.contentResolver.getType(uri).orEmpty()
@@ -217,14 +251,25 @@ private fun EditorScreen() {
    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("Inicio ${"%.1f".format(trimStart/1000f)} s", color = Color.LightGray, fontSize = 10.sp); Text("Fin ${"%.1f".format(trimEnd/1000f)} s", color = Color.LightGray, fontSize = 10.sp) }
   } else Text("Selecciona un video para ajustar inicio y fin", color = Color.Gray, fontSize = 10.sp)
   Spacer(Modifier.height(9.dp))
-  Text("HERRAMIENTAS", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+  Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+   Text("HERRAMIENTAS", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+   Spacer(Modifier.weight(1f))
+   TextButton(onClick = { undoTimeline() }, enabled = undoHistory.isNotEmpty()) {
+    Icon(Icons.Default.Undo, null, modifier = Modifier.size(17.dp))
+    Spacer(Modifier.width(3.dp)); Text("Deshacer", fontSize = 10.sp)
+   }
+   TextButton(onClick = { redoTimeline() }, enabled = redoHistory.isNotEmpty()) {
+    Icon(Icons.Default.Redo, null, modifier = Modifier.size(17.dp))
+    Spacer(Modifier.width(3.dp)); Text("Rehacer", fontSize = 10.sp)
+   }
+  }
   Spacer(Modifier.height(7.dp))
   Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
    ToolButton("Añadir", Icons.Default.Add) { picker.launch(arrayOf("video/*", "image/*", "audio/*")) }
    ToolButton("Cortar", Icons.Default.ContentCut) { status = "Ajusta inicio y fin del clip seleccionado y exporta el proyecto" }
    ToolButton("Audio", Icons.Default.MusicNote) { picker.launch(arrayOf("audio/*")) }
    ToolButton("Fotos", Icons.Default.Photo) { picker.launch(arrayOf("image/*")) }
-   ToolButton("Eliminar", Icons.Default.Delete) { selected?.let { clips.remove(it); selected = clips.firstOrNull { c -> c.kind == "VIDEO" }; trimStart = 0f; trimEnd = selected?.durationMs?.coerceAtLeast(1L)?.toFloat() ?: 1f; status = "Elemento eliminado" } }
+   ToolButton("Eliminar", Icons.Default.Delete) { selected?.let { saveTimelineState(); clips.remove(it); selected = clips.firstOrNull { c -> c.kind == "VIDEO" }; trimStart = 0f; trimEnd = selected?.durationMs?.coerceAtLeast(1L)?.toFloat() ?: 1f; status = "Elemento eliminado" } }
   }
   Spacer(Modifier.height(10.dp))
   Text("FILTRO DE VIDEO", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
@@ -278,8 +323,8 @@ private fun EditorScreen() {
      Icon(if (clip.kind == "VIDEO") Icons.Default.VideoLibrary else if (clip.kind == "AUDIO") Icons.Default.MusicNote else Icons.Default.Photo, null, tint = Accent)
      Spacer(Modifier.width(8.dp)); Column(Modifier.weight(1f)) { Text(clip.name, color = Color.White, fontSize = 11.sp); Text(if (clip.durationMs > 0) "${clip.kind} • ${"%.1f".format(clip.durationMs/1000f)} s" else clip.kind, color = Color.LightGray, fontSize = 9.sp) }
      val position = clips.indexOf(clip)
-     IconButton(onClick = { if (position > 0) { clips.removeAt(position); clips.add(position - 1, clip); status = "Orden actualizado" } }, enabled = position > 0, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.KeyboardArrowUp, "Subir", tint = if (position > 0) Accent else Color.DarkGray) }
-     IconButton(onClick = { if (position < clips.lastIndex) { clips.removeAt(position); clips.add(position + 1, clip); status = "Orden actualizado" } }, enabled = position < clips.lastIndex, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.KeyboardArrowDown, "Bajar", tint = if (position < clips.lastIndex) Accent else Color.DarkGray) }
+     IconButton(onClick = { if (position > 0) { saveTimelineState(); clips.removeAt(position); clips.add(position - 1, clip); status = "Orden actualizado" } }, enabled = position > 0, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.KeyboardArrowUp, "Subir", tint = if (position > 0) Accent else Color.DarkGray) }
+     IconButton(onClick = { if (position < clips.lastIndex) { saveTimelineState(); clips.removeAt(position); clips.add(position + 1, clip); status = "Orden actualizado" } }, enabled = position < clips.lastIndex, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.KeyboardArrowDown, "Bajar", tint = if (position < clips.lastIndex) Accent else Color.DarkGray) }
     }
    } }
   }
