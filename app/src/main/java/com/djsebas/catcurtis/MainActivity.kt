@@ -311,7 +311,8 @@ private fun EditorScreen() {
     val fadeOut = if (timing.fadeOutMs > 0L) {
      ((timing.endMs * 1000L - presentationTimeUs).toFloat() / (timing.fadeOutMs * 1000L)).coerceIn(0f, 1f)
     } else 1f
-    val alpha = minOf(fadeIn, fadeOut)
+    // La pista entrante gana opacidad sobre la anterior; la anterior permanece debajo para evitar fundidos a negro.
+    val alpha = fadeIn
     return object : OverlaySettings { override fun getAlphaScale(): Float = alpha }
    }
   }
