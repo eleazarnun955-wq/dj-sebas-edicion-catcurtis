@@ -3,6 +3,7 @@ package com.djsebas.catcurtis
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -64,7 +65,7 @@ private fun EditorScreen() {
   }
   Spacer(Modifier.height(14.dp))
   Box(Modifier.fillMaxWidth().weight(1.05f).background(Color.Black, RoundedCornerShape(18.dp)), contentAlignment = Alignment.Center) {
-   if (selected?.kind == "VIDEO") AndroidView(factory = { PlayerView(it).apply { player = player; useController = true } }, modifier = Modifier.fillMaxSize())
+   if (selected?.kind == "VIDEO") AndroidView(factory = { PlayerView(it).apply { this.player = player; useController = true } }, modifier = Modifier.fillMaxSize())
    else Column(horizontalAlignment = Alignment.CenterHorizontally) { Icon(Icons.Default.PlayArrow, null, tint = Accent, modifier = Modifier.size(58.dp)); Text("VISTA PREVIA", color = Color.LightGray, fontWeight = FontWeight.Bold); Text("Selecciona un video de tu biblioteca", color = Color.Gray, fontSize = 11.sp) }
   }
   Spacer(Modifier.height(12.dp))
