@@ -119,7 +119,17 @@ private fun EditorScreen() {
    sequenceItems.add(EditedMediaItem.Builder(mediaBuilder.build()).build())
   }
   val sequence = EditedMediaItemSequence(sequenceItems)
-  val composition = Composition.Builder(sequence).build()
+  // La primera pista de audio importada se mezcla como música de fondo y se repite
+  // hasta completar la duración total del montaje visual.
+  val soundtrack = clips.firstOrNull { it.kind == "AUDIO" }
+  val composition = if (soundtrack != null) {
+   val audioItem = EditedMediaItem.Builder(MediaItem.fromUri(soundtrack.uri)).build()
+   val audioSequence = EditedMediaItemSequence.withAudioFrom(listOf(audioItem))
+    .buildUpon().setIsLooping(true).build()
+   Composition.Builder(listOf(sequence, audioSequence)).build()
+  } else {
+   Composition.Builder(sequence).build()
+  }
   val transformer = Transformer.Builder(context).addListener(object : Transformer.Listener {
    override fun onCompleted(composition: Composition, exportResult: ExportResult) {
     worker.execute {
@@ -193,7 +203,7 @@ private fun EditorScreen() {
    } }
   }
   Spacer(Modifier.height(7.dp)); Text(status, color = Color(0xFFB9A8C8), fontSize = 10.sp, maxLines = 2)
-  Text("Exportación: videos unidos en orden y fotos de 5 segundos; el recorte se aplica al video seleccionado. La música añadida aún no se mezcla.", color = Color.Gray, fontSize = 9.sp, maxLines = 2)
+  Text("Exportación: videos y fotos en orden; primera pista de audio como música de fondo en bucle. Recorte aplicado al video seleccionado.", color = Color.Gray, fontSize = 9.sp, maxLines = 2)
  }
 }
 
