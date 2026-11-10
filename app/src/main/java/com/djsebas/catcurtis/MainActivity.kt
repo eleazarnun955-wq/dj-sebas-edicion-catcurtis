@@ -116,6 +116,7 @@ private fun EditorScreen() {
  var previewVolumeHistorySaved by remember { mutableStateOf(false) }
  var exportVolumeHistorySaved by remember { mutableStateOf(false) }
  var trackVolumeHistorySaved by remember { mutableStateOf(false) }
+ var photoDurationHistorySaved by remember { mutableStateOf(false) }
  val worker = remember { Executors.newSingleThreadExecutor() }
  val mainHandler = remember { Handler(Looper.getMainLooper()) }
 
@@ -387,6 +388,20 @@ private fun EditorScreen() {
    )
    Text("Selecciona una pista de audio en la línea de tiempo para ajustar su volumen por separado.", color = Color.Gray, fontSize = 9.sp)
   }
+  Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+   Text("DURACIÓN DE CADA FOTO", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+   Spacer(Modifier.weight(1f))
+   Text("${photoDurationSeconds.toInt()} s", color = Accent, fontSize = 11.sp)
+  }
+  Slider(
+   value = photoDurationSeconds,
+   onValueChange = { if (!photoDurationHistorySaved) { saveTimelineState(); photoDurationHistorySaved = true }; photoDurationSeconds = it },
+   valueRange = 1f..15f,
+   steps = 13,
+   modifier = Modifier.fillMaxWidth(),
+   onValueChangeFinished = { photoDurationHistorySaved = false }
+  )
+  Text("Elige cuánto tiempo aparece cada fotografía al exportar.", color = Color.Gray, fontSize = 9.sp)
   Text("TÍTULO SOBRE EL VIDEO", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
   OutlinedTextField(
    value = titleText,
