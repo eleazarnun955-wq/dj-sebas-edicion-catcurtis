@@ -83,6 +83,7 @@ private fun EditorScreen() {
  var filterMode by remember { mutableStateOf("Original") }
  var previewVolume by remember { mutableFloatStateOf(1f) }
  var exportAudioVolume by remember { mutableFloatStateOf(1f) }
+ val audioTrackVolumes = remember { mutableStateMapOf<Uri, Float>() }
  var exporting by remember { mutableStateOf(false) }
  val worker = remember { Executors.newSingleThreadExecutor() }
  val mainHandler = remember { Handler(Looper.getMainLooper()) }
@@ -194,7 +195,7 @@ private fun EditorScreen() {
    // Matrices de ganancia para audio mono, estéreo y multicanal habitual.
    for (channelCount in 1..6) {
     audioProcessor.putChannelMixingMatrix(
-     ChannelMixingMatrix.createForConstantPower(channelCount, channelCount).scaleBy(exportAudioVolume)
+     ChannelMixingMatrix.createForConstantPower(channelCount, channelCount).scaleBy(exportAudioVolume * (audioTrackVolumes[audioClip.uri] ?: 1f))
     )
    }
    val audioItem = EditedMediaItem.Builder(MediaItem.fromUri(audioClip.uri))
@@ -296,7 +297,23 @@ private fun EditorScreen() {
    Text("${(exportAudioVolume * 100).toInt()}%", color = Accent, fontSize = 11.sp)
   }
   Slider(value = exportAudioVolume, onValueChange = { exportAudioVolume = it }, valueRange = 0f..1f, modifier = Modifier.fillMaxWidth())
-  Text("Ajusta el nivel de todas las pistas musicales en el video final.", color = Color.Gray, fontSize = 9.sp)
+  Text("Ajusta el nivel general de todas las pistas musicales.", color = Color.Gray, fontSize = 9.sp)
+  if (selected?.kind == "AUDIO") {
+   val selectedAudio = selected!!
+   val trackVolume = audioTrackVolumes[selectedAudio.uri] ?: 1f
+   Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+    Text("VOLUMEN DE ESTA PISTA", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+    Spacer(Modifier.weight(1f))
+    Text("${(trackVolume * 100).toInt()}%", color = Accent, fontSize = 11.sp)
+   }
+   Slider(
+    value = trackVolume,
+    onValueChange = { audioTrackVolumes[selectedAudio.uri] = it },
+    valueRange = 0f..1f,
+    modifier = Modifier.fillMaxWidth()
+   )
+   Text("Selecciona una pista de audio en la línea de tiempo para ajustar su volumen por separado.", color = Color.Gray, fontSize = 9.sp)
+  }
   Text("TÍTULO SOBRE EL VIDEO", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
   OutlinedTextField(
    value = titleText,
