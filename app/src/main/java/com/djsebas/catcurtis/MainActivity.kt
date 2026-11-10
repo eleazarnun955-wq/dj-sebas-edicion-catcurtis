@@ -70,6 +70,19 @@ private val Bg = Color(0xFF0B0B12)
 private val Panel = Color(0xFF171724)
 private val Accent = Color(0xFFB64CFF)
 private data class Clip(val uri: Uri, val name: String, val kind: String, val durationMs: Long = 0L)
+private data class EditorSnapshot(
+ val clips: List<Clip>,
+ val selectedUri: Uri?,
+ val trimStart: Float,
+ val trimEnd: Float,
+ val titleText: String,
+ val filterMode: String,
+ val previewVolume: Float,
+ val exportAudioVolume: Float,
+ val photoDurationSeconds: Float,
+ val videoTrimRanges: Map<Uri, Pair<Long, Long>>,
+ val audioTrackVolumes: Map<Uri, Float>
+)
 
 class MainActivity : ComponentActivity() {
  override fun onCreate(savedInstanceState: Bundle?) {
@@ -84,8 +97,8 @@ private fun EditorScreen() {
  val context = LocalContext.current
  val clips = remember { mutableStateListOf<Clip>() }
  val thumbnails = remember { mutableStateMapOf<Uri, Bitmap>() }
- val undoHistory = remember { mutableStateListOf<List<Clip>>() }
- val redoHistory = remember { mutableStateListOf<List<Clip>>() }
+ val undoHistory = remember { mutableStateListOf<EditorSnapshot>() }
+ val redoHistory = remember { mutableStateListOf<EditorSnapshot>() }
  var selected by remember { mutableStateOf<Clip?>(null) }
  var trimStart by remember { mutableFloatStateOf(0f) }
  var trimEnd by remember { mutableFloatStateOf(1f) }
@@ -102,34 +115,41 @@ private fun EditorScreen() {
  val worker = remember { Executors.newSingleThreadExecutor() }
  val mainHandler = remember { Handler(Looper.getMainLooper()) }
 
- // Historial de cambios de la línea de tiempo (máximo 30 pasos).
+ // Historial completo del editor: hasta 30 estados, incluidos clips y ajustes.
+ fun captureEditorState() = EditorSnapshot(
+  clips.toList(), selected?.uri, trimStart, trimEnd, titleText, filterMode,
+  previewVolume, exportAudioVolume, photoDurationSeconds,
+  videoTrimRanges.toMap(), audioTrackVolumes.toMap()
+ )
  fun saveTimelineState() {
-  undoHistory.add(clips.toList())
+  undoHistory.add(captureEditorState())
   if (undoHistory.size > 30) undoHistory.removeAt(0)
   redoHistory.clear()
  }
- fun restoreTimeline(items: List<Clip>) {
-  clips.clear()
-  clips.addAll(items)
-  selected = selected?.let { current -> clips.firstOrNull { it.uri == current.uri } }
-   ?: clips.firstOrNull { it.kind == "VIDEO" }
-  trimStart = 0f
-  trimEnd = selected?.durationMs?.coerceAtLeast(1L)?.toFloat() ?: 1f
+ fun restoreTimeline(snapshot: EditorSnapshot) {
+  clips.clear(); clips.addAll(snapshot.clips)
+  selected = clips.firstOrNull { it.uri == snapshot.selectedUri } ?: clips.firstOrNull { it.kind == "VIDEO" }
+  trimStart = snapshot.trimStart; trimEnd = snapshot.trimEnd
+  titleText = snapshot.titleText; filterMode = snapshot.filterMode
+  previewVolume = snapshot.previewVolume; exportAudioVolume = snapshot.exportAudioVolume
+  photoDurationSeconds = snapshot.photoDurationSeconds
+  videoTrimRanges.clear(); videoTrimRanges.putAll(snapshot.videoTrimRanges)
+  audioTrackVolumes.clear(); audioTrackVolumes.putAll(snapshot.audioTrackVolumes)
  }
  fun undoTimeline() {
   if (undoHistory.isNotEmpty()) {
-   redoHistory.add(clips.toList())
+   redoHistory.add(captureEditorState())
    val previous = undoHistory.removeAt(undoHistory.lastIndex)
    restoreTimeline(previous)
-   status = "Último cambio de la línea de tiempo deshecho"
+   status = "Último cambio de edición deshecho"
   }
  }
  fun redoTimeline() {
   if (redoHistory.isNotEmpty()) {
-   undoHistory.add(clips.toList())
+   undoHistory.add(captureEditorState())
    val next = redoHistory.removeAt(redoHistory.lastIndex)
    restoreTimeline(next)
-   status = "Cambio de la línea de tiempo restaurado"
+   status = "Cambio de edición restaurado"
   }
  }
  val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
@@ -320,7 +340,7 @@ private fun EditorScreen() {
    listOf("Original", "Blanco y negro", "Negativo").forEach { option ->
     FilterChip(
      selected = filterMode == option,
-     onClick = { filterMode = option },
+     onClick = { if (filterMode != option) { saveTimelineState(); filterMode = option } },
      label = { Text(option, fontSize = 10.sp) },
      colors = FilterChipDefaults.filterChipColors(
       selectedContainerColor = Accent,
@@ -359,7 +379,7 @@ private fun EditorScreen() {
   Text("TÍTULO SOBRE EL VIDEO", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
   OutlinedTextField(
    value = titleText,
-   onValueChange = { titleText = it.take(80) },
+   onValueChange = { value -> if (value != titleText) saveTimelineState(); titleText = value.take(80) },
    modifier = Modifier.fillMaxWidth(),
    singleLine = true,
    placeholder = { Text("Escribe un título o nombre para tu video") },
