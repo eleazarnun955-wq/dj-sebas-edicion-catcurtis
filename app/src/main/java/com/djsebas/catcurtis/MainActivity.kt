@@ -407,6 +407,7 @@ private fun EditorScreen() {
     )
    }
   }
+  Text("TRANSICIÓN AUTOMÁTICA: fundido cruzado de hasta 0.5 s entre clips (se aplica al exportar).", color = Color.Gray, fontSize = 9.sp)
   Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Text("VOLUMEN DE VISTA PREVIA", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp); Spacer(Modifier.weight(1f)); Text("${(previewVolume * 100).toInt()}%", color = Accent, fontSize = 11.sp) }
   Slider(value = previewVolume, onValueChange = { if (!previewVolumeHistorySaved) { saveTimelineState(); previewVolumeHistorySaved = true }; previewVolume = it }, valueRange = 0f..1f, modifier = Modifier.fillMaxWidth(), onValueChangeFinished = { previewVolumeHistorySaved = false })
   Text("Este control ajusta únicamente la vista previa.", color = Color.Gray, fontSize = 9.sp)
