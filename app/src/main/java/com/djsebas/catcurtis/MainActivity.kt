@@ -4,6 +4,10 @@ import android.content.ContentValues
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Bundle
+import android.text.Spannable
+import android.text.SpannableString
+import android.text.style.ForegroundColorSpan
+import android.graphics.Color as AndroidColor
 import android.os.Environment
 import android.os.Handler
 import android.os.Looper
@@ -37,6 +41,10 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.transformer.Composition
 import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.EditedMediaItemSequence
+import androidx.media3.transformer.Effects
+import androidx.media3.effect.OverlayEffect
+import androidx.media3.effect.StaticOverlaySettings
+import androidx.media3.effect.TextOverlay
 import androidx.media3.transformer.ExportException
 import androidx.media3.transformer.ExportResult
 import androidx.media3.transformer.Transformer
@@ -66,6 +74,7 @@ private fun EditorScreen() {
  var trimStart by remember { mutableFloatStateOf(0f) }
  var trimEnd by remember { mutableFloatStateOf(1f) }
  var status by remember { mutableStateOf("Importa videos, fotos o música para comenzar") }
+ var titleText by remember { mutableStateOf("") }
  var exporting by remember { mutableStateOf(false) }
  val worker = remember { Executors.newSingleThreadExecutor() }
  val mainHandler = remember { Handler(Looper.getMainLooper()) }
@@ -115,7 +124,19 @@ private fun EditorScreen() {
      MediaItem.ClippingConfiguration.Builder().setStartPositionMs(trimStart.toLong()).setEndPositionMs(trimEnd.toLong()).build()
     )
    }
-   sequenceItems.add(EditedMediaItem.Builder(mediaBuilder.build()).build())
+   val editedBuilder = EditedMediaItem.Builder(mediaBuilder.build())
+   if (titleText.isNotBlank()) {
+    val styledTitle = SpannableString(titleText.trim()).apply {
+     setSpan(ForegroundColorSpan(AndroidColor.WHITE), 0, length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+    }
+    val titleSettings = StaticOverlaySettings.Builder()
+     .setOverlayFrameAnchor(0f, 0.78f)
+     .setBackgroundFrameAnchor(0f, 0.78f)
+     .build()
+    val titleOverlay = TextOverlay.createStaticTextOverlay(styledTitle, titleSettings)
+    editedBuilder.setEffects(Effects(emptyList(), listOf(OverlayEffect(listOf(titleOverlay)))))
+   }
+   sequenceItems.add(editedBuilder.build())
   }
   val sequence = EditedMediaItemSequence(sequenceItems)
   // La primera pista de audio importada se mezcla como música de fondo y se repite
@@ -187,6 +208,23 @@ private fun EditorScreen() {
    ToolButton("Eliminar", Icons.Default.Delete) { selected?.let { clips.remove(it); selected = clips.firstOrNull { c -> c.kind == "VIDEO" }; trimStart = 0f; trimEnd = selected?.durationMs?.coerceAtLeast(1L)?.toFloat() ?: 1f; status = "Elemento eliminado" } }
   }
   Spacer(Modifier.height(10.dp))
+  Text("TÍTULO SOBRE EL VIDEO", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+  OutlinedTextField(
+   value = titleText,
+   onValueChange = { titleText = it.take(80) },
+   modifier = Modifier.fillMaxWidth(),
+   singleLine = true,
+   placeholder = { Text("Escribe un título o nombre para tu video") },
+   colors = OutlinedTextFieldDefaults.colors(
+    focusedTextColor = Color.White,
+    unfocusedTextColor = Color.White,
+    focusedBorderColor = Accent,
+    unfocusedBorderColor = Color.Gray,
+    cursorColor = Accent
+   )
+  )
+  Text("El título se integrará al exportar el montaje.", color = Color.Gray, fontSize = 9.sp)
+  Spacer(Modifier.height(10.dp))
   Row(verticalAlignment = Alignment.CenterVertically) { Text("LÍNEA DE TIEMPO • AJUSTA EL ORDEN", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp); Spacer(Modifier.weight(1f)); Text("${clips.size} elementos", color = Color.Gray, fontSize = 11.sp) }
   Spacer(Modifier.height(6.dp))
   Row(Modifier.fillMaxWidth().height(105.dp).background(Panel, RoundedCornerShape(12.dp)).padding(7.dp)) {
@@ -202,7 +240,7 @@ private fun EditorScreen() {
    } }
   }
   Spacer(Modifier.height(7.dp)); Text(status, color = Color(0xFFB9A8C8), fontSize = 10.sp, maxLines = 2)
-  Text("Exportación: videos y fotos en orden; primera pista de audio como música de fondo en bucle. Recorte aplicado al video seleccionado.", color = Color.Gray, fontSize = 9.sp, maxLines = 2)
+  Text("Exportación: videos/fotos en orden, música en bucle y título integrado si escribes uno. Recorte aplicado al video seleccionado.", color = Color.Gray, fontSize = 9.sp, maxLines = 2)
  }
 }
 
