@@ -191,7 +191,7 @@ private fun EditorScreen() {
  }
  val player = remember { ExoPlayer.Builder(context).build() }
  LaunchedEffect(previewVolume) { player.volume = previewVolume }
- LaunchedEffect(selected, trimStart, trimEnd) {
+ LaunchedEffect(selected, trimStart, trimEnd, filterMode) {
   selected?.takeIf { it.kind == "VIDEO" }?.let { clip ->
    val start = trimStart.toLong().coerceAtLeast(0L)
    val end = trimEnd.toLong().coerceAtLeast(start + 1L)
