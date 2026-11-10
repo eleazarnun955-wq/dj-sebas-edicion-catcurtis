@@ -114,7 +114,6 @@ private fun EditorScreen() {
  var exportAudioVolume by remember { mutableFloatStateOf(1f) }
   var photoDurationSeconds by remember { mutableFloatStateOf(5f) }
  val audioTrackVolumes = remember { mutableStateMapOf<Uri, Float>() }
- // Cada video conserva su propio punto de inicio y final de recorte.
  val videoTrimRanges = remember { mutableStateMapOf<Uri, Pair<Long, Long>>() }
  var exporting by remember { mutableStateOf(false) }
  var trimHistorySaved by remember { mutableStateOf(false) }
@@ -125,7 +124,6 @@ private fun EditorScreen() {
  val worker = remember { Executors.newSingleThreadExecutor() }
  val mainHandler = remember { Handler(Looper.getMainLooper()) }
 
- // Historial completo del editor: hasta 30 estados, incluidos clips y ajustes.
  fun captureEditorState() = EditorSnapshot(
   clips.toList(), selected?.uri, trimStart, trimEnd, titleText, filterMode,
   previewVolume, exportAudioVolume, photoDurationSeconds,
@@ -220,7 +218,6 @@ private fun EditorScreen() {
 
  fun exportVideo() {
   val visualClips = clips.filter { it.kind == "VIDEO" || it.kind == "FOTO" }
-  val clip = selected
   if (visualClips.isEmpty()) { status = "Importa al menos un video o una foto"; return }
   val invalidTrim = visualClips.filter { it.kind == "VIDEO" }.any { video ->
    val range = videoTrimRanges[video.uri] ?: (0L to video.durationMs)
@@ -287,11 +284,8 @@ private fun EditorScreen() {
    if (timelineEndMs > timing.endMs) sequenceBuilder.addGap((timelineEndMs - timing.endMs) * 1000L)
    sequenceBuilder.build()
   }
-  // Todas las pistas de audio se mezclan simultáneamente y se repiten
-  // hasta completar la duración del montaje visual.
   val audioSequences = clips.filter { it.kind == "AUDIO" }.map { audioClip ->
    val audioProcessor = ChannelMixingAudioProcessor()
-   // Matrices de ganancia para audio mono, estéreo y multicanal habitual.
    for (channelCount in 1..6) {
     audioProcessor.putChannelMixingMatrix(
      ChannelMixingMatrix.createForConstantPower(channelCount, channelCount).scaleBy(exportAudioVolume * (audioTrackVolumes[audioClip.uri] ?: 1f))
@@ -357,8 +351,31 @@ private fun EditorScreen() {
   }
   Spacer(Modifier.height(12.dp))
   Box(Modifier.fillMaxWidth().weight(1f).background(Color.Black, RoundedCornerShape(18.dp)), contentAlignment = Alignment.Center) {
-   if (selected?.kind == "VIDEO") AndroidView(factory = { PlayerView(it).apply { this.player = player; useController = true } }, modifier = Modifier.fillMaxSize())
-   else Column(horizontalAlignment = Alignment.CenterHorizontally) { Icon(Icons.Default.PlayArrow, null, tint = Accent, modifier = Modifier.size(58.dp)); Text("VISTA PREVIA", color = Color.LightGray, fontWeight = FontWeight.Bold); Text("Selecciona un video de tu biblioteca", color = Color.Gray, fontSize = 11.sp) }
+   when (selected?.kind) {
+    "VIDEO" -> AndroidView(factory = { PlayerView(it).apply { this.player = player; useController = true } }, modifier = Modifier.fillMaxSize())
+    "FOTO" -> {
+     val photoBitmap = selected?.uri?.let { thumbnails[it] }
+     if (photoBitmap != null) {
+      Image(
+       bitmap = photoBitmap.asImageBitmap(),
+       contentDescription = "Vista previa de la fotografía seleccionada",
+       modifier = Modifier.fillMaxSize(),
+       contentScale = androidx.compose.ui.layout.ContentScale.Fit
+      )
+     } else {
+      Column(horizontalAlignment = Alignment.CenterHorizontally) {
+       CircularProgressIndicator(color = Accent, modifier = Modifier.size(34.dp))
+       Spacer(Modifier.height(8.dp))
+       Text("CARGANDO FOTO…", color = Color.LightGray, fontWeight = FontWeight.Bold)
+      }
+     }
+    }
+    else -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+     Icon(Icons.Default.PlayArrow, null, tint = Accent, modifier = Modifier.size(58.dp))
+     Text("VISTA PREVIA", color = Color.LightGray, fontWeight = FontWeight.Bold)
+     Text("Selecciona un video o una foto de tu biblioteca", color = Color.Gray, fontSize = 11.sp)
+    }
+   }
   }
   Spacer(Modifier.height(9.dp))
   Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("RECORTE DEL VIDEO SELECCIONADO", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp); Text(selected?.let { if (it.durationMs > 0) "${"%.1f".format((trimEnd-trimStart)/1000f)} s" else "Sin duración" } ?: "Sin selección", color = Accent, fontSize = 10.sp) }
