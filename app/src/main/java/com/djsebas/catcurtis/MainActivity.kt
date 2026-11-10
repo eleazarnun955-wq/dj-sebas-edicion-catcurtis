@@ -38,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -121,6 +122,7 @@ private fun EditorScreen() {
  var exportVolumeHistorySaved by remember { mutableStateOf(false) }
  var trackVolumeHistorySaved by remember { mutableStateOf(false) }
  var photoDurationHistorySaved by remember { mutableStateOf(false) }
+ var titleHistorySaved by remember { mutableStateOf(false) }
  val worker = remember { Executors.newSingleThreadExecutor() }
  val mainHandler = remember { Handler(Looper.getMainLooper()) }
 
@@ -174,7 +176,7 @@ private fun EditorScreen() {
    val clip = Clip(uri, uri.lastPathSegment?.substringAfterLast('/')?.take(28) ?: "Medio importado", kind, duration)
    clips.add(clip)
    if (kind == "VIDEO") videoTrimRanges[uri] = 0L to duration.coerceAtLeast(1L)
-   if (selected == null && kind == "VIDEO") { selected = clip; trimStart = 0f; trimEnd = duration.coerceAtLeast(1L).toFloat() }
+   if (selected == null && (kind == "VIDEO" || kind == "FOTO")) { selected = clip; trimStart = 0f; trimEnd = if (kind == "VIDEO") duration.coerceAtLeast(1L).toFloat() else 1f }
   }
   status = if (uris.isEmpty()) "No se seleccionaron archivos" else "${uris.size} archivo(s) agregados"
  }
@@ -212,6 +214,9 @@ private fun EditorScreen() {
     else -> emptyList()
    })
    player.setMediaItem(item); player.prepare()
+  } ?: run {
+   player.pause()
+   player.clearMediaItems()
   }
  }
  DisposableEffect(Unit) { onDispose { player.release(); worker.shutdown() } }
@@ -469,8 +474,11 @@ private fun EditorScreen() {
   Text("TÍTULO SOBRE EL VIDEO", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
   OutlinedTextField(
    value = titleText,
-   onValueChange = { value -> if (value != titleText) saveTimelineState(); titleText = value.take(80) },
-   modifier = Modifier.fillMaxWidth(),
+   onValueChange = { value ->
+    if (value != titleText && !titleHistorySaved) { saveTimelineState(); titleHistorySaved = true }
+    titleText = value.take(80)
+   },
+   modifier = Modifier.fillMaxWidth().onFocusChanged { if (!it.isFocused) titleHistorySaved = false },
    singleLine = true,
    placeholder = { Text("Escribe un título o nombre para tu video") },
    colors = OutlinedTextFieldDefaults.colors(
