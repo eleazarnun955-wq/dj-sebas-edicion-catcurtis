@@ -152,7 +152,7 @@ private fun EditorScreen() {
   Spacer(Modifier.height(9.dp))
   Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("RECORTE DEL VIDEO", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp); Text(selected?.let { if (it.durationMs > 0) "${"%.1f".format((trimEnd-trimStart)/1000f)} s" else "Sin duración" } ?: "Sin selección", color = Accent, fontSize = 10.sp) }
   if (selected?.kind == "VIDEO" && (selected?.durationMs ?: 0L) > 0L) {
-   RangeSlider(value = trimStart.coerceAtMost(trimEnd)..trimEnd.coerceAtLeast(trimStart + 0.01f), onValueChange = { trimStart = it.start; trimEnd = it.end }, valueRange = 0f..selected!!.durationMs.toFloat(), modifier = Modifier.fillMaxWidth())
+   RangeSlider(value = trimStart.coerceAtMost(trimEnd)..trimEnd.coerceAtLeast(trimStart + 0.01f), onValueChange = { trimStart = it.start; trimEnd = it.endInclusive }, valueRange = 0f..selected!!.durationMs.toFloat(), modifier = Modifier.fillMaxWidth())
    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("Inicio ${"%.1f".format(trimStart/1000f)} s", color = Color.LightGray, fontSize = 10.sp); Text("Fin ${"%.1f".format(trimEnd/1000f)} s", color = Color.LightGray, fontSize = 10.sp) }
   } else Text("Selecciona un video para ajustar inicio y fin", color = Color.Gray, fontSize = 10.sp)
   Spacer(Modifier.height(9.dp))
