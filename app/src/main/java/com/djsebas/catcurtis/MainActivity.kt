@@ -37,6 +37,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
+import androidx.media3.common.audio.ChannelMixingAudioProcessor
+import androidx.media3.common.audio.ChannelMixingMatrix
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.transformer.Composition
 import androidx.media3.transformer.EditedMediaItem
@@ -78,6 +80,7 @@ private fun EditorScreen() {
  var titleText by remember { mutableStateOf("") }
  var filterMode by remember { mutableStateOf("Original") }
  var previewVolume by remember { mutableFloatStateOf(1f) }
+ var exportAudioVolume by remember { mutableFloatStateOf(1f) }
  var exporting by remember { mutableStateOf(false) }
  val worker = remember { Executors.newSingleThreadExecutor() }
  val mainHandler = remember { Handler(Looper.getMainLooper()) }
@@ -153,7 +156,16 @@ private fun EditorScreen() {
   // Todas las pistas de audio se mezclan simultáneamente y se repiten
   // hasta completar la duración del montaje visual.
   val audioSequences = clips.filter { it.kind == "AUDIO" }.map { audioClip ->
-   val audioItem = EditedMediaItem.Builder(MediaItem.fromUri(audioClip.uri)).build()
+   val audioProcessor = ChannelMixingAudioProcessor()
+   // Matrices de ganancia para audio mono, estéreo y multicanal habitual.
+   for (channelCount in 1..6) {
+    audioProcessor.putChannelMixingMatrix(
+     ChannelMixingMatrix.createForConstantPower(channelCount, channelCount).scaleBy(exportAudioVolume)
+    )
+   }
+   val audioItem = EditedMediaItem.Builder(MediaItem.fromUri(audioClip.uri))
+    .setEffects(Effects(listOf(audioProcessor), emptyList()))
+    .build()
    EditedMediaItemSequence.Builder(audioItem).setIsLooping(true).build()
   }
   val composition = Composition.Builder(listOf(sequence) + audioSequences).build()
@@ -232,7 +244,14 @@ private fun EditorScreen() {
   }
   Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Text("VOLUMEN DE VISTA PREVIA", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp); Spacer(Modifier.weight(1f)); Text("${(previewVolume * 100).toInt()}%", color = Accent, fontSize = 11.sp) }
   Slider(value = previewVolume, onValueChange = { previewVolume = it }, valueRange = 0f..1f, modifier = Modifier.fillMaxWidth())
-  Text("Este control ajusta el sonido al reproducir; no modifica el volumen del archivo exportado.", color = Color.Gray, fontSize = 9.sp)
+  Text("Este control ajusta únicamente la vista previa.", color = Color.Gray, fontSize = 9.sp)
+  Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+   Text("VOLUMEN DE MÚSICA EXPORTADA", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+   Spacer(Modifier.weight(1f))
+   Text("${(exportAudioVolume * 100).toInt()}%", color = Accent, fontSize = 11.sp)
+  }
+  Slider(value = exportAudioVolume, onValueChange = { exportAudioVolume = it }, valueRange = 0f..1f, modifier = Modifier.fillMaxWidth())
+  Text("Ajusta el nivel de todas las pistas musicales en el video final.", color = Color.Gray, fontSize = 9.sp)
   Text("TÍTULO SOBRE EL VIDEO", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
   OutlinedTextField(
    value = titleText,
