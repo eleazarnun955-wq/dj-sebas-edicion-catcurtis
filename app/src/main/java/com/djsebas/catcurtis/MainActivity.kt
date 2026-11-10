@@ -124,8 +124,8 @@ private fun EditorScreen() {
   val soundtrack = clips.firstOrNull { it.kind == "AUDIO" }
   val composition = if (soundtrack != null) {
    val audioItem = EditedMediaItem.Builder(MediaItem.fromUri(soundtrack.uri)).build()
-   val audioSequence = EditedMediaItemSequence.withAudioFrom(listOf(audioItem))
-    .buildUpon().setIsLooping(true).build()
+   val audioSequence = EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_AUDIO))
+    .addItem(audioItem).setIsLooping(true).build()
    Composition.Builder(listOf(sequence, audioSequence)).build()
   } else {
    Composition.Builder(sequence).build()
