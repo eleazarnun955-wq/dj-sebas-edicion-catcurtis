@@ -45,6 +45,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
+import androidx.media3.common.C
+import androidx.media3.common.OverlaySettings
+import androidx.media3.common.VideoCompositorSettings
+import androidx.media3.common.util.Size
 import androidx.media3.common.audio.ChannelMixingAudioProcessor
 import androidx.media3.common.audio.ChannelMixingMatrix
 import androidx.media3.common.util.UnstableApi
@@ -70,6 +74,7 @@ private val Bg = Color(0xFF0B0B12)
 private val Panel = Color(0xFF171724)
 private val Accent = Color(0xFFB64CFF)
 private data class Clip(val uri: Uri, val name: String, val kind: String, val durationMs: Long = 0L)
+private data class ClipTiming(val startMs: Long, val endMs: Long, val fadeInMs: Long, val fadeOutMs: Long)
 private data class EditorSnapshot(
  val clips: List<Clip>,
  val selectedUri: Uri?,
@@ -226,7 +231,19 @@ private fun EditorScreen() {
   status = "Preparando ${visualClips.size} clip(s) de video/foto… no cierres la aplicación"
   val output = File(context.cacheDir, "catcurtis_${System.currentTimeMillis()}.mp4")
   val sequenceItems = mutableListOf<EditedMediaItem>()
-  visualClips.forEach { video ->
+  val clipDurationsMs = visualClips.map { video ->
+   if (video.kind == "FOTO") (photoDurationSeconds * 1000f).toLong().coerceAtLeast(1L)
+   else {
+    val range = videoTrimRanges[video.uri] ?: (0L to video.durationMs)
+    (range.second - range.first).coerceAtLeast(1L)
+   }
+  }
+  val overlapDurationsMs = (0 until (visualClips.size - 1)).map { index ->
+   minOf(500L, clipDurationsMs[index] / 2L, clipDurationsMs[index + 1] / 2L)
+  }
+  val clipTimings = mutableListOf<ClipTiming>()
+  var timelineEndMs = 0L
+  visualClips.forEachIndexed { index, video ->
    val mediaBuilder = MediaItem.Builder().setUri(video.uri)
    if (video.kind == "FOTO") mediaBuilder.setImageDurationMs((photoDurationSeconds * 1000f).toLong())
    if (video.kind == "VIDEO") {
@@ -254,9 +271,22 @@ private fun EditorScreen() {
    if (videoEffects.isNotEmpty() || overlays.isNotEmpty()) {
     editedBuilder.setEffects(Effects(emptyList(), videoEffects + overlays))
    }
+   val fadeInMs = if (index > 0) overlapDurationsMs[index - 1] else 0L
+   val fadeOutMs = if (index < visualClips.lastIndex) overlapDurationsMs[index] else 0L
+   val startMs = if (index == 0) 0L else (timelineEndMs - fadeInMs).coerceAtLeast(0L)
+   val endMs = startMs + clipDurationsMs[index]
+   clipTimings.add(ClipTiming(startMs, endMs, fadeInMs, fadeOutMs))
+   timelineEndMs = endMs
    sequenceItems.add(editedBuilder.build())
   }
-  val sequence = EditedMediaItemSequence(sequenceItems)
+  val videoSequences = sequenceItems.mapIndexed { index, item ->
+   val timing = clipTimings[index]
+   val sequenceBuilder = EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_VIDEO))
+   if (timing.startMs > 0L) sequenceBuilder.addGap(timing.startMs * 1000L)
+   sequenceBuilder.addItem(item)
+   if (timelineEndMs > timing.endMs) sequenceBuilder.addGap((timelineEndMs - timing.endMs) * 1000L)
+   sequenceBuilder.build()
+  }
   // Todas las pistas de audio se mezclan simultáneamente y se repiten
   // hasta completar la duración del montaje visual.
   val audioSequences = clips.filter { it.kind == "AUDIO" }.map { audioClip ->
@@ -272,7 +302,23 @@ private fun EditorScreen() {
     .build()
    EditedMediaItemSequence.Builder(audioItem).setIsLooping(true).build()
   }
-  val composition = Composition.Builder(listOf(sequence) + audioSequences).build()
+  val compositorSettings = object : VideoCompositorSettings {
+   override fun getOutputSize(inputSizes: List<Size>): Size = inputSizes.first()
+   override fun getOverlaySettings(inputId: Int, presentationTimeUs: Long): OverlaySettings {
+    val timing = clipTimings.getOrNull(inputId) ?: return object : OverlaySettings {}
+    val fadeIn = if (timing.fadeInMs > 0L) {
+     ((presentationTimeUs - timing.startMs * 1000L).toFloat() / (timing.fadeInMs * 1000L)).coerceIn(0f, 1f)
+    } else 1f
+    val fadeOut = if (timing.fadeOutMs > 0L) {
+     ((timing.endMs * 1000L - presentationTimeUs).toFloat() / (timing.fadeOutMs * 1000L)).coerceIn(0f, 1f)
+    } else 1f
+    val alpha = minOf(fadeIn, fadeOut)
+    return object : OverlaySettings { override fun getAlphaScale(): Float = alpha }
+   }
+  }
+  val composition = Composition.Builder(videoSequences + audioSequences)
+   .setVideoCompositorSettings(compositorSettings)
+   .build()
   val transformer = Transformer.Builder(context).addListener(object : Transformer.Listener {
    override fun onCompleted(composition: Composition, exportResult: ExportResult) {
     worker.execute {
