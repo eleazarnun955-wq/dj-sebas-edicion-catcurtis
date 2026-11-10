@@ -8,7 +8,7 @@ Open with Android Studio or run `./gradlew assembleDebug`.
 
 The GitHub Actions workflow builds a debug APK and publishes it as an artifact.
 
-## Current features (1.2.0)
+## Current features (1.3.0)
 
 - Dark editing-studio interface
 - Import multiple videos, photos and audio files using Android's system picker
@@ -18,15 +18,15 @@ The GitHub Actions workflow builds a debug APK and publishes it as an artifact.
 - Sequential export of video clips and still photos in timeline order
 - Each photo is rendered for five seconds in the exported MP4
 - The selected video's trim range is applied during project export
+- The first imported audio file is mixed as a looping background soundtrack until the visual montage ends
 - Export saved under `Movies/DJ SEBAS CATCURTIS`
 
 ## Still pending
 
-- Imported audio as a separate soundtrack in the exported composition
 - True multi-track timeline and drag-and-drop clip reordering
 - Text, titles, stickers, transitions, filters and visual effects
 - Undo/redo, speed controls, keyframes and advanced audio controls
 
-Photos are currently exported as five-second still-image segments. Audio files can be imported into the media bin but are not yet mixed into the exported video.
+Photos are currently exported as five-second still-image segments. The first imported audio file is used as a looping soundtrack during export; additional independent audio tracks and volume automation remain pending.
 
 This is an independent application package: `com.djsebas.catcurtis`.
