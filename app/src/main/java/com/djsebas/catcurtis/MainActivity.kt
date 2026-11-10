@@ -143,7 +143,7 @@ private fun EditorScreen() {
     listOf(OverlayEffect(listOf(TextOverlay.createStaticTextOverlay(styledTitle, titleSettings))))
    } else emptyList()
    if (videoEffects.isNotEmpty() || overlays.isNotEmpty()) {
-    editedBuilder.setEffects(Effects(videoEffects, overlays))
+    editedBuilder.setEffects(Effects(emptyList(), videoEffects + overlays))
    }
    sequenceItems.add(editedBuilder.build())
   }
