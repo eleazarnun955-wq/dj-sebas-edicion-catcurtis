@@ -19,5 +19,6 @@ dependencies {
  implementation("androidx.media3:media3-exoplayer:1.6.0")
  implementation("androidx.media3:media3-transformer:1.6.0")
  implementation("androidx.media3:media3-ui:1.6.0")
+ implementation("androidx.media3:media3-effect:1.6.0")
  debugImplementation("androidx.compose.ui:ui-tooling")
 }
