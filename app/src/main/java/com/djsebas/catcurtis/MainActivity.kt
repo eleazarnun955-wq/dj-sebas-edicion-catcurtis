@@ -83,6 +83,7 @@ private fun EditorScreen() {
  var filterMode by remember { mutableStateOf("Original") }
  var previewVolume by remember { mutableFloatStateOf(1f) }
  var exportAudioVolume by remember { mutableFloatStateOf(1f) }
+  var photoDurationSeconds by remember { mutableFloatStateOf(5f) }
  val audioTrackVolumes = remember { mutableStateMapOf<Uri, Float>() }
  var exporting by remember { mutableStateOf(false) }
  val worker = remember { Executors.newSingleThreadExecutor() }
@@ -160,7 +161,7 @@ private fun EditorScreen() {
   val sequenceItems = mutableListOf<EditedMediaItem>()
   visualClips.forEach { video ->
    val mediaBuilder = MediaItem.Builder().setUri(video.uri)
-   if (video.kind == "FOTO") mediaBuilder.setImageDurationMs(5000L)
+   if (video.kind == "FOTO") mediaBuilder.setImageDurationMs((photoDurationSeconds * 1000f).toLong())
    if (video.kind == "VIDEO" && video == clip) {
     mediaBuilder.setClippingConfiguration(
      MediaItem.ClippingConfiguration.Builder().setStartPositionMs(trimStart.toLong()).setEndPositionMs(trimEnd.toLong()).build()
