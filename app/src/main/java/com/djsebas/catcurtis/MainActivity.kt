@@ -45,6 +45,7 @@ import androidx.media3.transformer.Effects
 import androidx.media3.effect.OverlayEffect
 import androidx.media3.effect.StaticOverlaySettings
 import androidx.media3.effect.TextOverlay
+import androidx.media3.effect.RgbFilter
 import androidx.media3.transformer.ExportException
 import androidx.media3.transformer.ExportResult
 import androidx.media3.transformer.Transformer
@@ -75,6 +76,7 @@ private fun EditorScreen() {
  var trimEnd by remember { mutableFloatStateOf(1f) }
  var status by remember { mutableStateOf("Importa videos, fotos o música para comenzar") }
  var titleText by remember { mutableStateOf("") }
+ var filterMode by remember { mutableStateOf("Original") }
  var exporting by remember { mutableStateOf(false) }
  val worker = remember { Executors.newSingleThreadExecutor() }
  val mainHandler = remember { Handler(Looper.getMainLooper()) }
@@ -125,7 +127,12 @@ private fun EditorScreen() {
     )
    }
    val editedBuilder = EditedMediaItem.Builder(mediaBuilder.build())
-   if (titleText.isNotBlank()) {
+   val videoEffects = when (filterMode) {
+    "Blanco y negro" -> listOf(RgbFilter.createGrayscaleFilter())
+    "Negativo" -> listOf(RgbFilter.createInvertedFilter())
+    else -> emptyList()
+   }
+   val overlays = if (titleText.isNotBlank()) {
     val styledTitle = SpannableString(titleText.trim()).apply {
      setSpan(ForegroundColorSpan(AndroidColor.WHITE), 0, length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
     }
@@ -133,8 +140,10 @@ private fun EditorScreen() {
      .setOverlayFrameAnchor(0f, 0.78f)
      .setBackgroundFrameAnchor(0f, 0.78f)
      .build()
-    val titleOverlay = TextOverlay.createStaticTextOverlay(styledTitle, titleSettings)
-    editedBuilder.setEffects(Effects(emptyList(), listOf(OverlayEffect(listOf(titleOverlay)))))
+    listOf(OverlayEffect(listOf(TextOverlay.createStaticTextOverlay(styledTitle, titleSettings))))
+   } else emptyList()
+   if (videoEffects.isNotEmpty() || overlays.isNotEmpty()) {
+    editedBuilder.setEffects(Effects(videoEffects, overlays))
    }
    sequenceItems.add(editedBuilder.build())
   }
@@ -208,6 +217,21 @@ private fun EditorScreen() {
    ToolButton("Eliminar", Icons.Default.Delete) { selected?.let { clips.remove(it); selected = clips.firstOrNull { c -> c.kind == "VIDEO" }; trimStart = 0f; trimEnd = selected?.durationMs?.coerceAtLeast(1L)?.toFloat() ?: 1f; status = "Elemento eliminado" } }
   }
   Spacer(Modifier.height(10.dp))
+  Text("FILTRO DE VIDEO", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+  Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+   listOf("Original", "Blanco y negro", "Negativo").forEach { option ->
+    FilterChip(
+     selected = filterMode == option,
+     onClick = { filterMode = option },
+     label = { Text(option, fontSize = 10.sp) },
+     colors = FilterChipDefaults.filterChipColors(
+      selectedContainerColor = Accent,
+      selectedLabelColor = Color.White,
+      labelColor = Color.LightGray
+     )
+    )
+   }
+  }
   Text("TÍTULO SOBRE EL VIDEO", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
   OutlinedTextField(
    value = titleText,
@@ -240,7 +264,7 @@ private fun EditorScreen() {
    } }
   }
   Spacer(Modifier.height(7.dp)); Text(status, color = Color(0xFFB9A8C8), fontSize = 10.sp, maxLines = 2)
-  Text("Exportación: videos/fotos en orden, música en bucle y título integrado si escribes uno. Recorte aplicado al video seleccionado.", color = Color.Gray, fontSize = 9.sp, maxLines = 2)
+  Text("Exportación: clips en orden, música en bucle, título y filtro seleccionados. Recorte aplicado al video seleccionado.", color = Color.Gray, fontSize = 9.sp, maxLines = 2)
  }
 }
 
