@@ -107,7 +107,7 @@ private fun EditorScreen() {
   exporting = true
   status = "Uniendo ${videoClips.size} video(s)… no cierres la aplicación"
   val output = File(context.cacheDir, "catcurtis_${System.currentTimeMillis()}.mp4")
-  val sequenceBuilder = EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_AUDIO, C.TRACK_TYPE_VIDEO))
+  val sequenceItems = mutableListOf<EditedMediaItem>()
   videoClips.forEach { video ->
    val mediaBuilder = MediaItem.Builder().setUri(video.uri)
    if (video == clip) {
@@ -115,9 +115,10 @@ private fun EditorScreen() {
      MediaItem.ClippingConfiguration.Builder().setStartPositionMs(trimStart.toLong()).setEndPositionMs(trimEnd.toLong()).build()
     )
    }
-   sequenceBuilder.addItem(EditedMediaItem.Builder(mediaBuilder.build()).build())
+   sequenceItems.add(EditedMediaItem.Builder(mediaBuilder.build()).build())
   }
-  val composition = Composition.Builder(sequenceBuilder.build()).build()
+  val sequence = EditedMediaItemSequence(sequenceItems)
+  val composition = Composition.Builder(sequence).build()
   val transformer = Transformer.Builder(context).addListener(object : Transformer.Listener {
    override fun onCompleted(composition: Composition, exportResult: ExportResult) {
     worker.execute {
