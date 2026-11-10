@@ -112,6 +112,10 @@ private fun EditorScreen() {
  // Cada video conserva su propio punto de inicio y final de recorte.
  val videoTrimRanges = remember { mutableStateMapOf<Uri, Pair<Long, Long>>() }
  var exporting by remember { mutableStateOf(false) }
+ var trimHistorySaved by remember { mutableStateOf(false) }
+ var previewVolumeHistorySaved by remember { mutableStateOf(false) }
+ var exportVolumeHistorySaved by remember { mutableStateOf(false) }
+ var trackVolumeHistorySaved by remember { mutableStateOf(false) }
  val worker = remember { Executors.newSingleThreadExecutor() }
  val mainHandler = remember { Handler(Looper.getMainLooper()) }
 
@@ -313,9 +317,10 @@ private fun EditorScreen() {
   Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("RECORTE DEL VIDEO SELECCIONADO", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp); Text(selected?.let { if (it.durationMs > 0) "${"%.1f".format((trimEnd-trimStart)/1000f)} s" else "Sin duración" } ?: "Sin selección", color = Accent, fontSize = 10.sp) }
   if (selected?.kind == "VIDEO" && (selected?.durationMs ?: 0L) > 0L) {
    RangeSlider(value = trimStart.coerceAtMost(trimEnd)..trimEnd.coerceAtLeast(trimStart + 0.01f), onValueChange = {
+    if (!trimHistorySaved) { saveTimelineState(); trimHistorySaved = true }
     trimStart = it.start; trimEnd = it.endInclusive
     selected?.let { current -> videoTrimRanges[current.uri] = trimStart.toLong() to trimEnd.toLong() }
-   }, valueRange = 0f..selected!!.durationMs.toFloat(), modifier = Modifier.fillMaxWidth())
+   }, valueRange = 0f..selected!!.durationMs.toFloat(), modifier = Modifier.fillMaxWidth(), onValueChangeFinished = { trimHistorySaved = false })
    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("Inicio ${"%.1f".format(trimStart/1000f)} s", color = Color.LightGray, fontSize = 10.sp); Text("Fin ${"%.1f".format(trimEnd/1000f)} s", color = Color.LightGray, fontSize = 10.sp) }
   } else Text("Selecciona un video para ajustar inicio y fin", color = Color.Gray, fontSize = 10.sp)
   Spacer(Modifier.height(9.dp))
@@ -356,14 +361,14 @@ private fun EditorScreen() {
    }
   }
   Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Text("VOLUMEN DE VISTA PREVIA", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp); Spacer(Modifier.weight(1f)); Text("${(previewVolume * 100).toInt()}%", color = Accent, fontSize = 11.sp) }
-  Slider(value = previewVolume, onValueChange = { previewVolume = it }, valueRange = 0f..1f, modifier = Modifier.fillMaxWidth())
+  Slider(value = previewVolume, onValueChange = { if (!previewVolumeHistorySaved) { saveTimelineState(); previewVolumeHistorySaved = true }; previewVolume = it }, valueRange = 0f..1f, modifier = Modifier.fillMaxWidth(), onValueChangeFinished = { previewVolumeHistorySaved = false })
   Text("Este control ajusta únicamente la vista previa.", color = Color.Gray, fontSize = 9.sp)
   Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
    Text("VOLUMEN DE MÚSICA EXPORTADA", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
    Spacer(Modifier.weight(1f))
    Text("${(exportAudioVolume * 100).toInt()}%", color = Accent, fontSize = 11.sp)
   }
-  Slider(value = exportAudioVolume, onValueChange = { exportAudioVolume = it }, valueRange = 0f..1f, modifier = Modifier.fillMaxWidth())
+  Slider(value = exportAudioVolume, onValueChange = { if (!exportVolumeHistorySaved) { saveTimelineState(); exportVolumeHistorySaved = true }; exportAudioVolume = it }, valueRange = 0f..1f, modifier = Modifier.fillMaxWidth(), onValueChangeFinished = { exportVolumeHistorySaved = false })
   Text("Ajusta el nivel general de todas las pistas musicales.", color = Color.Gray, fontSize = 9.sp)
   if (selected?.kind == "AUDIO") {
    val selectedAudio = selected!!
@@ -375,9 +380,10 @@ private fun EditorScreen() {
    }
    Slider(
     value = trackVolume,
-    onValueChange = { audioTrackVolumes[selectedAudio.uri] = it },
+    onValueChange = { if (!trackVolumeHistorySaved) { saveTimelineState(); trackVolumeHistorySaved = true }; audioTrackVolumes[selectedAudio.uri] = it },
     valueRange = 0f..1f,
-    modifier = Modifier.fillMaxWidth()
+    modifier = Modifier.fillMaxWidth(),
+    onValueChangeFinished = { trackVolumeHistorySaved = false }
    )
    Text("Selecciona una pista de audio en la línea de tiempo para ajustar su volumen por separado.", color = Color.Gray, fontSize = 9.sp)
   }
