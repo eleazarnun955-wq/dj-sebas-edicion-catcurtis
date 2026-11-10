@@ -8,6 +8,10 @@ import android.text.Spannable
 import android.text.SpannableString
 import android.text.style.ForegroundColorSpan
 import android.graphics.Color as AndroidColor
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.os.Build
+import android.util.Size
 import android.os.Environment
 import android.os.Handler
 import android.os.Looper
@@ -16,6 +20,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -31,6 +36,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -55,6 +61,8 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import java.io.File
 import java.util.concurrent.Executors
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 private val Bg = Color(0xFF0B0B12)
 private val Panel = Color(0xFF171724)
@@ -73,6 +81,7 @@ class MainActivity : ComponentActivity() {
 private fun EditorScreen() {
  val context = LocalContext.current
  val clips = remember { mutableStateListOf<Clip>() }
+ val thumbnails = remember { mutableStateMapOf<Uri, Bitmap>() }
  val undoHistory = remember { mutableStateListOf<List<Clip>>() }
  val redoHistory = remember { mutableStateListOf<List<Clip>>() }
  var selected by remember { mutableStateOf<Clip?>(null) }
@@ -138,6 +147,25 @@ private fun EditorScreen() {
    if (selected == null && kind == "VIDEO") { selected = clip; trimStart = 0f; trimEnd = duration.coerceAtLeast(1L).toFloat() }
   }
   status = if (uris.isEmpty()) "No se seleccionaron archivos" else "${uris.size} archivo(s) agregados"
+ }
+ LaunchedEffect(clips.map { it.uri }) {
+  val loaded = withContext(Dispatchers.IO) {
+   clips.filter { it.kind == "VIDEO" || it.kind == "FOTO" }.mapNotNull { clip ->
+    val bitmap = runCatching {
+     if (Build.VERSION.SDK_INT >= 29) {
+      context.contentResolver.loadThumbnail(clip.uri, Size(240, 160), null)
+     } else if (clip.kind == "VIDEO") {
+      val retriever = MediaMetadataRetriever()
+      try { retriever.setDataSource(context, clip.uri); retriever.getFrameAtTime(0L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC) }
+      finally { retriever.release() }
+     } else {
+      context.contentResolver.openInputStream(clip.uri)?.use { BitmapFactory.decodeStream(it) }
+     }
+    }.getOrNull()
+    bitmap?.let { clip.uri to it }
+   }
+  }
+  loaded.forEach { (uri, bitmap) -> thumbnails[uri] = bitmap }
  }
  val player = remember { ExoPlayer.Builder(context).build() }
  LaunchedEffect(previewVolume) { player.volume = previewVolume }
@@ -353,7 +381,12 @@ private fun EditorScreen() {
      val range = videoTrimRanges[clip.uri] ?: (0L to clip.durationMs.coerceAtLeast(1L))
      trimStart = range.first.toFloat(); trimEnd = range.second.toFloat()
     }.padding(7.dp), verticalAlignment = Alignment.CenterVertically) {
-     Icon(if (clip.kind == "VIDEO") Icons.Default.VideoLibrary else if (clip.kind == "AUDIO") Icons.Default.MusicNote else Icons.Default.Photo, null, tint = Accent)
+     val thumb = thumbnails[clip.uri]
+     if (thumb != null && (clip.kind == "VIDEO" || clip.kind == "FOTO")) {
+      Image(bitmap = thumb.asImageBitmap(), contentDescription = "Miniatura de ${clip.name}", modifier = Modifier.size(width = 54.dp, height = 40.dp))
+     } else {
+      Icon(if (clip.kind == "VIDEO") Icons.Default.VideoLibrary else if (clip.kind == "AUDIO") Icons.Default.MusicNote else Icons.Default.Photo, null, tint = Accent, modifier = Modifier.size(30.dp))
+     }
      Spacer(Modifier.width(8.dp)); Column(Modifier.weight(1f)) { Text(clip.name, color = Color.White, fontSize = 11.sp); Text(if (clip.durationMs > 0) "${clip.kind} • ${"%.1f".format(clip.durationMs/1000f)} s" else clip.kind, color = Color.LightGray, fontSize = 9.sp) }
      val position = clips.indexOf(clip)
      IconButton(onClick = { if (position > 0) { saveTimelineState(); clips.removeAt(position); clips.add(position - 1, clip); status = "Orden actualizado" } }, enabled = position > 0, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.KeyboardArrowUp, "Subir", tint = if (position > 0) Accent else Color.DarkGray) }
