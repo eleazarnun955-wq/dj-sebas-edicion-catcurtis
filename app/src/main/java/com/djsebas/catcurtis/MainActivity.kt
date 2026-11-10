@@ -32,7 +32,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.transformer.Composition
@@ -124,8 +123,8 @@ private fun EditorScreen() {
   val soundtrack = clips.firstOrNull { it.kind == "AUDIO" }
   val composition = if (soundtrack != null) {
    val audioItem = EditedMediaItem.Builder(MediaItem.fromUri(soundtrack.uri)).build()
-   val audioSequence = EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_AUDIO))
-    .addItem(audioItem).setIsLooping(true).build()
+   val audioSequence = EditedMediaItemSequence.Builder(audioItem)
+    .setIsLooping(true).build()
    Composition.Builder(listOf(sequence, audioSequence)).build()
   } else {
    Composition.Builder(sequence).build()
