@@ -171,20 +171,23 @@ private fun EditorScreen() {
   Spacer(Modifier.height(7.dp))
   Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
    ToolButton("Añadir", Icons.Default.Add) { picker.launch(arrayOf("video/*", "image/*", "audio/*")) }
-   ToolButton("Cortar", Icons.Default.ContentCut) { status = "Mueve los controles de inicio y fin y pulsa Exportar MP4" }
+   ToolButton("Cortar", Icons.Default.ContentCut) { status = "Ajusta inicio y fin del clip seleccionado y exporta el proyecto" }
    ToolButton("Audio", Icons.Default.MusicNote) { picker.launch(arrayOf("audio/*")) }
    ToolButton("Fotos", Icons.Default.Photo) { picker.launch(arrayOf("image/*")) }
    ToolButton("Eliminar", Icons.Default.Delete) { selected?.let { clips.remove(it); selected = clips.firstOrNull { c -> c.kind == "VIDEO" }; trimStart = 0f; trimEnd = selected?.durationMs?.coerceAtLeast(1L)?.toFloat() ?: 1f; status = "Elemento eliminado" } }
   }
   Spacer(Modifier.height(10.dp))
-  Row(verticalAlignment = Alignment.CenterVertically) { Text("LÍNEA DE TIEMPO • ORDEN DE EXPORTACIÓN", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp); Spacer(Modifier.weight(1f)); Text("${clips.size} elementos", color = Color.Gray, fontSize = 11.sp) }
+  Row(verticalAlignment = Alignment.CenterVertically) { Text("LÍNEA DE TIEMPO • AJUSTA EL ORDEN", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp); Spacer(Modifier.weight(1f)); Text("${clips.size} elementos", color = Color.Gray, fontSize = 11.sp) }
   Spacer(Modifier.height(6.dp))
   Row(Modifier.fillMaxWidth().height(105.dp).background(Panel, RoundedCornerShape(12.dp)).padding(7.dp)) {
    if (clips.isEmpty()) Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { Text("＋ Agrega videos, fotos o música. Los videos se unirán en orden.", color = Color.Gray, fontSize = 12.sp) }
    else LazyColumn(verticalArrangement = Arrangement.spacedBy(5.dp)) { items(clips) { clip ->
     Row(Modifier.fillMaxWidth().background(if (selected == clip) Color(0xFF38234A) else Color(0xFF242434), RoundedCornerShape(7.dp)).clickable { selected = clip; trimStart = 0f; trimEnd = clip.durationMs.coerceAtLeast(1L).toFloat() }.padding(7.dp), verticalAlignment = Alignment.CenterVertically) {
      Icon(if (clip.kind == "VIDEO") Icons.Default.VideoLibrary else if (clip.kind == "AUDIO") Icons.Default.MusicNote else Icons.Default.Photo, null, tint = Accent)
-     Spacer(Modifier.width(8.dp)); Column { Text(clip.name, color = Color.White, fontSize = 11.sp); Text(if (clip.durationMs > 0) "${clip.kind} • ${"%.1f".format(clip.durationMs/1000f)} s" else clip.kind, color = Color.LightGray, fontSize = 9.sp) }
+     Spacer(Modifier.width(8.dp)); Column(Modifier.weight(1f)) { Text(clip.name, color = Color.White, fontSize = 11.sp); Text(if (clip.durationMs > 0) "${clip.kind} • ${"%.1f".format(clip.durationMs/1000f)} s" else clip.kind, color = Color.LightGray, fontSize = 9.sp) }
+     val position = clips.indexOf(clip)
+     IconButton(onClick = { if (position > 0) { clips.removeAt(position); clips.add(position - 1, clip); status = "Orden actualizado" } }, enabled = position > 0, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.KeyboardArrowUp, "Subir", tint = if (position > 0) Accent else Color.DarkGray) }
+     IconButton(onClick = { if (position < clips.lastIndex) { clips.removeAt(position); clips.add(position + 1, clip); status = "Orden actualizado" } }, enabled = position < clips.lastIndex, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.KeyboardArrowDown, "Bajar", tint = if (position < clips.lastIndex) Accent else Color.DarkGray) }
     }
    } }
   }
