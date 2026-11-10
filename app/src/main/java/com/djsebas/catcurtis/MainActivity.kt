@@ -85,6 +85,8 @@ private fun EditorScreen() {
  var exportAudioVolume by remember { mutableFloatStateOf(1f) }
   var photoDurationSeconds by remember { mutableFloatStateOf(5f) }
  val audioTrackVolumes = remember { mutableStateMapOf<Uri, Float>() }
+ // Cada video conserva su propio punto de inicio y final de recorte.
+ val videoTrimRanges = remember { mutableStateMapOf<Uri, Pair<Long, Long>>() }
  var exporting by remember { mutableStateOf(false) }
  val worker = remember { Executors.newSingleThreadExecutor() }
  val mainHandler = remember { Handler(Looper.getMainLooper()) }
@@ -132,6 +134,7 @@ private fun EditorScreen() {
    }.getOrDefault(0L) else 0L
    val clip = Clip(uri, uri.lastPathSegment?.substringAfterLast('/')?.take(28) ?: "Medio importado", kind, duration)
    clips.add(clip)
+   if (kind == "VIDEO") videoTrimRanges[uri] = 0L to duration.coerceAtLeast(1L)
    if (selected == null && kind == "VIDEO") { selected = clip; trimStart = 0f; trimEnd = duration.coerceAtLeast(1L).toFloat() }
   }
   status = if (uris.isEmpty()) "No se seleccionaron archivos" else "${uris.size} archivo(s) agregados"
@@ -154,7 +157,11 @@ private fun EditorScreen() {
   val visualClips = clips.filter { it.kind == "VIDEO" || it.kind == "FOTO" }
   val clip = selected
   if (visualClips.isEmpty()) { status = "Importa al menos un video o una foto"; return }
-  if (clip?.kind == "VIDEO" && (clip.durationMs <= 0L || trimEnd <= trimStart)) { status = "El rango de recorte no es válido"; return }
+  val invalidTrim = visualClips.filter { it.kind == "VIDEO" }.any { video ->
+   val range = videoTrimRanges[video.uri] ?: (0L to video.durationMs)
+   video.durationMs <= 0L || range.second <= range.first || range.second > video.durationMs
+  }
+  if (invalidTrim) { status = "Hay un video con un rango de recorte no válido"; return }
   exporting = true
   status = "Preparando ${visualClips.size} clip(s) de video/foto… no cierres la aplicación"
   val output = File(context.cacheDir, "catcurtis_${System.currentTimeMillis()}.mp4")
@@ -162,9 +169,10 @@ private fun EditorScreen() {
   visualClips.forEach { video ->
    val mediaBuilder = MediaItem.Builder().setUri(video.uri)
    if (video.kind == "FOTO") mediaBuilder.setImageDurationMs((photoDurationSeconds * 1000f).toLong())
-   if (video.kind == "VIDEO" && video == clip) {
+   if (video.kind == "VIDEO") {
+    val range = videoTrimRanges[video.uri] ?: (0L to video.durationMs)
     mediaBuilder.setClippingConfiguration(
-     MediaItem.ClippingConfiguration.Builder().setStartPositionMs(trimStart.toLong()).setEndPositionMs(trimEnd.toLong()).build()
+     MediaItem.ClippingConfiguration.Builder().setStartPositionMs(range.first).setEndPositionMs(range.second).build()
     )
    }
    val editedBuilder = EditedMediaItem.Builder(mediaBuilder.build())
@@ -249,7 +257,10 @@ private fun EditorScreen() {
   Spacer(Modifier.height(9.dp))
   Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("RECORTE DEL VIDEO SELECCIONADO", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp); Text(selected?.let { if (it.durationMs > 0) "${"%.1f".format((trimEnd-trimStart)/1000f)} s" else "Sin duración" } ?: "Sin selección", color = Accent, fontSize = 10.sp) }
   if (selected?.kind == "VIDEO" && (selected?.durationMs ?: 0L) > 0L) {
-   RangeSlider(value = trimStart.coerceAtMost(trimEnd)..trimEnd.coerceAtLeast(trimStart + 0.01f), onValueChange = { trimStart = it.start; trimEnd = it.endInclusive }, valueRange = 0f..selected!!.durationMs.toFloat(), modifier = Modifier.fillMaxWidth())
+   RangeSlider(value = trimStart.coerceAtMost(trimEnd)..trimEnd.coerceAtLeast(trimStart + 0.01f), onValueChange = {
+    trimStart = it.start; trimEnd = it.endInclusive
+    selected?.let { current -> videoTrimRanges[current.uri] = trimStart.toLong() to trimEnd.toLong() }
+   }, valueRange = 0f..selected!!.durationMs.toFloat(), modifier = Modifier.fillMaxWidth())
    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("Inicio ${"%.1f".format(trimStart/1000f)} s", color = Color.LightGray, fontSize = 10.sp); Text("Fin ${"%.1f".format(trimEnd/1000f)} s", color = Color.LightGray, fontSize = 10.sp) }
   } else Text("Selecciona un video para ajustar inicio y fin", color = Color.Gray, fontSize = 10.sp)
   Spacer(Modifier.height(9.dp))
@@ -337,7 +348,11 @@ private fun EditorScreen() {
   Row(Modifier.fillMaxWidth().height(105.dp).background(Panel, RoundedCornerShape(12.dp)).padding(7.dp)) {
    if (clips.isEmpty()) Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { Text("＋ Agrega videos, fotos o música. Videos y fotos se exportan en orden.", color = Color.Gray, fontSize = 12.sp) }
    else LazyColumn(verticalArrangement = Arrangement.spacedBy(5.dp)) { items(clips) { clip ->
-    Row(Modifier.fillMaxWidth().background(if (selected == clip) Color(0xFF38234A) else Color(0xFF242434), RoundedCornerShape(7.dp)).clickable { selected = clip; trimStart = 0f; trimEnd = clip.durationMs.coerceAtLeast(1L).toFloat() }.padding(7.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().background(if (selected == clip) Color(0xFF38234A) else Color(0xFF242434), RoundedCornerShape(7.dp)).clickable {
+     selected = clip
+     val range = videoTrimRanges[clip.uri] ?: (0L to clip.durationMs.coerceAtLeast(1L))
+     trimStart = range.first.toFloat(); trimEnd = range.second.toFloat()
+    }.padding(7.dp), verticalAlignment = Alignment.CenterVertically) {
      Icon(if (clip.kind == "VIDEO") Icons.Default.VideoLibrary else if (clip.kind == "AUDIO") Icons.Default.MusicNote else Icons.Default.Photo, null, tint = Accent)
      Spacer(Modifier.width(8.dp)); Column(Modifier.weight(1f)) { Text(clip.name, color = Color.White, fontSize = 11.sp); Text(if (clip.durationMs > 0) "${clip.kind} • ${"%.1f".format(clip.durationMs/1000f)} s" else clip.kind, color = Color.LightGray, fontSize = 9.sp) }
      val position = clips.indexOf(clip)
