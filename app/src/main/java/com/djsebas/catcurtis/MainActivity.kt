@@ -187,7 +187,8 @@ private fun EditorScreen() {
     }
    } }
   }
-  Spacer(Modifier.height(7.dp)); Text(status, color = Color(0xFFB9A8C8), fontSize = 10.sp, maxLines = 2)\n  Text("Exportación actual: unión secuencial de videos; el recorte se aplica al video seleccionado.", color = Color.Gray, fontSize = 9.sp, maxLines = 2)
+  Spacer(Modifier.height(7.dp)); Text(status, color = Color(0xFFB9A8C8), fontSize = 10.sp, maxLines = 2)
+  Text("Exportación actual: unión secuencial de videos; el recorte se aplica al video seleccionado.", color = Color.Gray, fontSize = 9.sp, maxLines = 2)
  }
 }
 
