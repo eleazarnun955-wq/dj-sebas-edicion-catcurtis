@@ -198,6 +198,11 @@ private fun EditorScreen() {
    val item = MediaItem.Builder().setUri(clip.uri).setClippingConfiguration(
     MediaItem.ClippingConfiguration.Builder().setStartPositionMs(start).setEndPositionMs(end).build()
    ).build()
+   player.setVideoEffects(when (filterMode) {
+    "Blanco y negro" -> listOf(RgbFilter.createGrayscaleFilter())
+    "Negativo" -> listOf(RgbFilter.createInvertedFilter())
+    else -> emptyList()
+   })
    player.setMediaItem(item); player.prepare()
   }
  }
