@@ -100,17 +100,18 @@ private fun EditorScreen() {
  DisposableEffect(Unit) { onDispose { player.release(); worker.shutdown() } }
 
  fun exportVideo() {
-  val videoClips = clips.filter { it.kind == "VIDEO" }
+  val visualClips = clips.filter { it.kind == "VIDEO" || it.kind == "FOTO" }
   val clip = selected
-  if (clip == null || clip.kind != "VIDEO" || videoClips.isEmpty()) { status = "Importa y selecciona al menos un video"; return }
-  if (clip.durationMs <= 0L || trimEnd <= trimStart) { status = "El rango de recorte no es válido"; return }
+  if (visualClips.isEmpty()) { status = "Importa al menos un video o una foto"; return }
+  if (clip?.kind == "VIDEO" && (clip.durationMs <= 0L || trimEnd <= trimStart)) { status = "El rango de recorte no es válido"; return }
   exporting = true
-  status = "Uniendo ${videoClips.size} video(s)… no cierres la aplicación"
+  status = "Preparando ${visualClips.size} clip(s) de video/foto… no cierres la aplicación"
   val output = File(context.cacheDir, "catcurtis_${System.currentTimeMillis()}.mp4")
   val sequenceItems = mutableListOf<EditedMediaItem>()
-  videoClips.forEach { video ->
+  visualClips.forEach { video ->
    val mediaBuilder = MediaItem.Builder().setUri(video.uri)
-   if (video == clip) {
+   if (video.kind == "FOTO") mediaBuilder.setImageDurationMs(5000L)
+   if (video.kind == "VIDEO" && video == clip) {
     mediaBuilder.setClippingConfiguration(
      MediaItem.ClippingConfiguration.Builder().setStartPositionMs(trimStart.toLong()).setEndPositionMs(trimEnd.toLong()).build()
     )
@@ -180,7 +181,7 @@ private fun EditorScreen() {
   Row(verticalAlignment = Alignment.CenterVertically) { Text("LÍNEA DE TIEMPO • AJUSTA EL ORDEN", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp); Spacer(Modifier.weight(1f)); Text("${clips.size} elementos", color = Color.Gray, fontSize = 11.sp) }
   Spacer(Modifier.height(6.dp))
   Row(Modifier.fillMaxWidth().height(105.dp).background(Panel, RoundedCornerShape(12.dp)).padding(7.dp)) {
-   if (clips.isEmpty()) Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { Text("＋ Agrega videos, fotos o música. Los videos se unirán en orden.", color = Color.Gray, fontSize = 12.sp) }
+   if (clips.isEmpty()) Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { Text("＋ Agrega videos, fotos o música. Videos y fotos se exportan en orden.", color = Color.Gray, fontSize = 12.sp) }
    else LazyColumn(verticalArrangement = Arrangement.spacedBy(5.dp)) { items(clips) { clip ->
     Row(Modifier.fillMaxWidth().background(if (selected == clip) Color(0xFF38234A) else Color(0xFF242434), RoundedCornerShape(7.dp)).clickable { selected = clip; trimStart = 0f; trimEnd = clip.durationMs.coerceAtLeast(1L).toFloat() }.padding(7.dp), verticalAlignment = Alignment.CenterVertically) {
      Icon(if (clip.kind == "VIDEO") Icons.Default.VideoLibrary else if (clip.kind == "AUDIO") Icons.Default.MusicNote else Icons.Default.Photo, null, tint = Accent)
@@ -192,7 +193,7 @@ private fun EditorScreen() {
    } }
   }
   Spacer(Modifier.height(7.dp)); Text(status, color = Color(0xFFB9A8C8), fontSize = 10.sp, maxLines = 2)
-  Text("Exportación actual: unión secuencial de videos; el recorte se aplica al video seleccionado.", color = Color.Gray, fontSize = 9.sp, maxLines = 2)
+  Text("Exportación: videos unidos en orden y fotos de 5 segundos; el recorte se aplica al video seleccionado. La música añadida aún no se mezcla.", color = Color.Gray, fontSize = 9.sp, maxLines = 2)
  }
 }
 
