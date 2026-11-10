@@ -150,17 +150,13 @@ private fun EditorScreen() {
    sequenceItems.add(editedBuilder.build())
   }
   val sequence = EditedMediaItemSequence(sequenceItems)
-  // La primera pista de audio importada se mezcla como música de fondo y se repite
-  // hasta completar la duración total del montaje visual.
-  val soundtrack = clips.firstOrNull { it.kind == "AUDIO" }
-  val composition = if (soundtrack != null) {
-   val audioItem = EditedMediaItem.Builder(MediaItem.fromUri(soundtrack.uri)).build()
-   val audioSequence = EditedMediaItemSequence.Builder(audioItem)
-    .setIsLooping(true).build()
-   Composition.Builder(listOf(sequence, audioSequence)).build()
-  } else {
-   Composition.Builder(sequence).build()
+  // Todas las pistas de audio se mezclan simultáneamente y se repiten
+  // hasta completar la duración del montaje visual.
+  val audioSequences = clips.filter { it.kind == "AUDIO" }.map { audioClip ->
+   val audioItem = EditedMediaItem.Builder(MediaItem.fromUri(audioClip.uri)).build()
+   EditedMediaItemSequence.Builder(audioItem).setIsLooping(true).build()
   }
+  val composition = Composition.Builder(listOf(sequence) + audioSequences).build()
   val transformer = Transformer.Builder(context).addListener(object : Transformer.Listener {
    override fun onCompleted(composition: Composition, exportResult: ExportResult) {
     worker.execute {
