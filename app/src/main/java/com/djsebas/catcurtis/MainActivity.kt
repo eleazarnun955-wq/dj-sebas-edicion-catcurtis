@@ -89,6 +89,7 @@ private data class EditorSnapshot(
  val photoDurationSeconds: Float,
  val titleScale: Float,
  val titleColor: Int,
+ val titleVerticalPosition: Float,
  val videoTrimRanges: Map<Uri, Pair<Long, Long>>,
  val audioTrackVolumes: Map<Uri, Float>
 )
@@ -119,6 +120,8 @@ private fun EditorScreen() {
   var photoDurationSeconds by remember { mutableFloatStateOf(5f) }
  var titleScale by remember { mutableFloatStateOf(1f) }
  var titleColor by remember { mutableIntStateOf(AndroidColor.WHITE) }
+ var titleVerticalPosition by remember { mutableFloatStateOf(0.78f) }
+ var titlePositionHistorySaved by remember { mutableStateOf(false) }
  var titleScaleHistorySaved by remember { mutableStateOf(false) }
  val audioTrackVolumes = remember { mutableStateMapOf<Uri, Float>() }
  val videoTrimRanges = remember { mutableStateMapOf<Uri, Pair<Long, Long>>() }
@@ -134,7 +137,7 @@ private fun EditorScreen() {
 
  fun captureEditorState() = EditorSnapshot(
   clips.toList(), selected?.uri, trimStart, trimEnd, titleText, filterMode,
-  previewVolume, exportAudioVolume, photoDurationSeconds, titleScale, titleColor,
+  previewVolume, exportAudioVolume, photoDurationSeconds, titleScale, titleColor, titleVerticalPosition,
   videoTrimRanges.toMap(), audioTrackVolumes.toMap()
  )
  fun saveTimelineState() {
@@ -151,6 +154,7 @@ private fun EditorScreen() {
   photoDurationSeconds = snapshot.photoDurationSeconds
   titleScale = snapshot.titleScale
   titleColor = snapshot.titleColor
+  titleVerticalPosition = snapshot.titleVerticalPosition
   videoTrimRanges.clear(); videoTrimRanges.putAll(snapshot.videoTrimRanges)
   audioTrackVolumes.clear(); audioTrackVolumes.putAll(snapshot.audioTrackVolumes)
  }
@@ -274,8 +278,8 @@ private fun EditorScreen() {
      setSpan(RelativeSizeSpan(titleScale), 0, length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
     }
     val titleSettings = StaticOverlaySettings.Builder()
-     .setOverlayFrameAnchor(0f, 0.78f)
-     .setBackgroundFrameAnchor(0f, 0.78f)
+     .setOverlayFrameAnchor(0f, titleVerticalPosition)
+     .setBackgroundFrameAnchor(0f, titleVerticalPosition)
      .build()
     listOf(OverlayEffect(listOf(TextOverlay.createStaticTextOverlay(styledTitle, titleSettings))))
    } else emptyList()
@@ -525,6 +529,19 @@ private fun EditorScreen() {
     }
    }
   }
+  Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+   Text("POSICIÓN VERTICAL", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+   Spacer(Modifier.weight(1f))
+   Text(if (titleVerticalPosition < 0.4f) "Arriba" else if (titleVerticalPosition > 0.65f) "Abajo" else "Centro", color = Accent, fontSize = 11.sp)
+  }
+  Slider(
+   value = titleVerticalPosition,
+   onValueChange = { if (!titlePositionHistorySaved) { saveTimelineState(); titlePositionHistorySaved = true }; titleVerticalPosition = it },
+   valueRange = 0.15f..0.85f,
+   modifier = Modifier.fillMaxWidth(),
+   onValueChangeFinished = { titlePositionHistorySaved = false }
+  )
+  Text("Mueve el título entre la parte superior, el centro y la parte inferior del video.", color = Color.Gray, fontSize = 9.sp)
   Spacer(Modifier.height(10.dp))
   Row(verticalAlignment = Alignment.CenterVertically) { Text("LÍNEA DE TIEMPO • AJUSTA EL ORDEN", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp); Spacer(Modifier.weight(1f)); Text("${clips.size} elementos", color = Color.Gray, fontSize = 11.sp) }
   Spacer(Modifier.height(6.dp))
