@@ -4,7 +4,7 @@ Editor de video Android independiente, con interfaz oscura y herramientas locale
 
 ## Estado actual
 
-Versión de código: **1.25.0**  
+Versión de código: **1.26.0**  
 Paquete Android: `com.djsebas.catcurtis`  
 SDK mínimo: Android 8.0 (API 26)  
 Compilación: GitHub Actions genera un APK de depuración.
@@ -14,9 +14,11 @@ Compilación: GitHub Actions genera un APK de depuración.
 - Importación múltiple de videos, fotografías y pistas de audio mediante el selector de archivos de Android.
 - Permisos persistentes de lectura para los medios importados.
 - Vista previa de video con ExoPlayer y vista previa de fotografías.
+- Vista previa del título superpuesto con color, tamaño y posición seleccionados.
+- Guardado automático y restauración del último proyecto local, sujeto a que Android conserve los permisos de los archivos importados.
 - Miniaturas de los medios visuales.
 - Línea de tiempo/lista de medios con selección, reordenamiento y eliminación.
-- Recorte de inicio y fin de cada video mediante controles de rango.
+- Recorte de inicio y fin de cada video mediante controles de rango, con acción explícita para aplicar el corte.
 - Duración ajustable de fotografías (1 a 15 segundos).
 - Transición de fundido cruzado de hasta 0.5 segundos durante la exportación.
 - Filtros de video: original, blanco y negro y negativo.
