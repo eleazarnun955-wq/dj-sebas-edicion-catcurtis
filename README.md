@@ -1,55 +1,43 @@
 # DJ SEBAS EDICIÓN CATCURTIS
 
-Editor de video Android independiente, con interfaz oscura y herramientas locales de montaje.
+Editor de video Android independiente, con herramientas locales de montaje.
 
-## Estado actual
+## Versión actual
 
-Versión de código: **1.37.0**  
-Paquete Android de esta edición independiente: `com.djsebas.catcurtis.installfix`  
-Esta edición usa un identificador propio para instalarse separada de las otras aplicaciones DJ Sebas.  
-SDK mínimo: Android 8.0 (API 26)  
-Compilación: GitHub Actions genera y publica un APK de depuración; la compilación no sustituye las pruebas funcionales en un dispositivo real.
+- Versión: **1.39.0**
+- Paquete Android independiente: `com.djsebas.catcurtis.v139`
+- SDK mínimo: Android 8.0 (API 26)
+- GitHub Actions genera el APK; la compilación no sustituye las pruebas funcionales en un teléfono físico.
 
 ## Funciones implementadas en el código
 
-- Importación múltiple de videos, fotografías y pistas de audio mediante el selector de archivos de Android.
-- Permisos persistentes de lectura para los medios importados.
-- Vista previa de video con ExoPlayer y vista previa de fotografías.
-- Vista previa del título superpuesto con color, tamaño y posición seleccionados.
-- Guardado automático y restauración del último proyecto local, sujeto a que Android conserve los permisos de los archivos importados.
-- Al eliminar un medio, la selección pasa al siguiente video o fotografía disponible y se limpian sus ajustes de audio/recorte asociados.
-- Confirmación del rango de recorte sin crear entradas duplicadas en el historial Deshacer/Rehacer.
-- Miniaturas de los medios visuales.
-- Línea de tiempo visual con carriles separados para video/fotografías y audio, bloques seleccionables, duración/volumen visibles y reordenamiento directo arrastrando los clips visuales.
-- Lista de medios con selección, reordenamiento y eliminación.
-- Recorte de inicio y fin de cada video mediante controles de rango, con acción explícita para aplicar el corte.
-- Duración ajustable de fotografías (1 a 15 segundos).
-- Animación de fotografías durante la exportación con movimientos Ken Burns: zoom de acercamiento/alejamiento y paneos horizontal/vertical. Cada ajuste se guarda por fotografía y participa en Deshacer/Rehacer.
-- Transición de fundido cruzado ajustable por clip (de corte directo a 2 segundos), con ajuste general alternativo, durante la exportación.
-- Filtros de foto y video por clip: original, blanco y negro, negativo, sepia, cálido y frío; se guardan con el proyecto y se aplican también a la exportación.
-- Título superpuesto con texto editable, cinco colores, tamaño ajustable (50 % a 200 %) y posición vertical.
-- Historial Deshacer/Rehacer de hasta 30 estados para los ajustes admitidos.
-- Mezcla de varias pistas de audio en bucle, con volumen general, volumen individual y recorte independiente de inicio/fin por pista.
-- Control de volumen independiente para la vista previa.
+- Importación múltiple de videos, fotografías y pistas de audio.
+- Permisos persistentes de lectura para medios importados.
+- Vista previa de video con ExoPlayer y vista previa animada de fotografías.
+- Movimiento de fotografías Ken Burns: zoom de acercamiento/alejamiento, paneos horizontales/verticales y **zoom combinado con paneo**.
+- Los movimientos de fotografía se aplican en la vista previa y durante la exportación MP4.
+- Filtros por clip: original, blanco y negro, negativo, sepia, cálido y frío.
+- Transiciones de fundido ajustables por clip.
+- Línea de tiempo visual con carriles de video/fotografía y audio; selección y reordenamiento de clips.
+- Recorte de inicio y fin de video y audio.
+- Duración ajustable de fotografías y ajuste automático aproximado a la duración de la música.
+- Título superpuesto con texto, color, tamaño y posición configurables.
+- Varias pistas de audio con volumen general, volumen individual y recorte independiente.
+- Guardado automático/restauración del último proyecto local.
+- Historial Deshacer/Rehacer para los ajustes admitidos.
 - Exportación MP4 a `Películas/DJ SEBAS CATCURTIS`.
 
 ## Pendiente de validación o desarrollo
 
-- Pruebas completas de exportación con combinaciones reales de videos, fotos y varias pistas de audio.
-- Verificación en un teléfono físico Android, incluyendo el Moto G24 del usuario.
-- Administración de varios proyectos independientes con nombres y guardado manual (actualmente se conserva automáticamente el último proyecto).
-- Integración directa con el motor de Ani/Anijam (no hay API pública documentada confirmada; por ahora se pueden importar a la línea de tiempo los videos/escenas generados externamente).
-- Fotogramas clave, animación avanzada, subtítulos automáticos, control de velocidad y biblioteca ampliada de efectos/transiciones.
-- Verificar en dispositivo el rendimiento, compatibilidad de códecs y estabilidad con archivos largos.
+- Pruebas completas en dispositivo físico de reproducción y exportación con distintos códecs y combinaciones de medios.
+- Fotogramas clave, animación avanzada, subtítulos automáticos, control de velocidad y más transiciones.
+- Administración de varios proyectos con nombres y guardado manual.
+- Integración directa con Ani/Anijam: no se ha confirmado una API pública documentada. Mientras tanto, se pueden importar escenas o videos generados externamente. El movimiento Ken Burns local no equivale a generación de escenas por IA.
 
 ## Compilar
-
-Con Android Studio o mediante GitHub Actions, ejecutar:
 
 ```bash
 gradle assembleDebug --no-daemon
 ```
 
-El APK de depuración se publica como artefacto del flujo de trabajo **Android APK**.
-
-**Importante:** una compilación exitosa confirma que el código compila; no sustituye las pruebas de reproducción y exportación en un dispositivo real.
+El APK de depuración se publica como artefacto del flujo **Android APK**.
