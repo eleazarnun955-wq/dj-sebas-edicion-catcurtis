@@ -315,7 +315,13 @@ private fun EditorScreen() {
     for (i in 0 until trims.length()) {
      val item = trims.optJSONObject(i) ?: continue
      val uri = Uri.parse(item.optString("uri"))
-     if (clips.any { it.uri == uri }) videoTrimRanges[uri] = item.optLong("start") to item.optLong("end")
+     val clip = clips.firstOrNull { it.uri == uri && it.kind == "VIDEO" } ?: continue
+     val duration = clip.durationMs
+     if (duration > 0L) {
+      val start = item.optLong("start").coerceIn(0L, duration - 1L)
+      val end = item.optLong("end").coerceIn(start + 1L, duration)
+      videoTrimRanges[uri] = start to end
+     }
     }
     audioTrackVolumes.clear()
     val volumes = json.optJSONArray("audioTrackVolumes") ?: JSONArray()
@@ -329,7 +335,13 @@ private fun EditorScreen() {
     for (i in 0 until audioTrims.length()) {
      val item = audioTrims.optJSONObject(i) ?: continue
      val uri = Uri.parse(item.optString("uri"))
-     if (clips.any { it.uri == uri && it.kind == "AUDIO" }) audioTrimRanges[uri] = item.optLong("start") to item.optLong("end")
+     val clip = clips.firstOrNull { it.uri == uri && it.kind == "AUDIO" } ?: continue
+     val duration = clip.durationMs
+     if (duration > 0L) {
+      val start = item.optLong("start").coerceIn(0L, duration - 1L)
+      val end = item.optLong("end").coerceIn(start + 1L, duration)
+      audioTrimRanges[uri] = start to end
+     }
     }
     clipFilters.clear()
     val savedFilters = json.optJSONArray("clipFilters") ?: JSONArray()
