@@ -4,7 +4,7 @@ Editor de video Android independiente, con interfaz oscura y herramientas locale
 
 ## Estado actual
 
-Versión de código: **1.34.0**  
+Versión de código: **1.35.0**  
 Paquete Android de esta edición independiente: `com.djsebas.catcurtis`  
 Esta edición usa un identificador propio para instalarse separada de las otras aplicaciones DJ Sebas.  
 SDK mínimo: Android 8.0 (API 26)  
@@ -28,7 +28,7 @@ Compilación: GitHub Actions genera y publica un APK de depuración; la compilac
 - Filtros de foto y video por clip: original, blanco y negro, negativo, sepia, cálido y frío; se guardan con el proyecto y se aplican también a la exportación.
 - Título superpuesto con texto editable, cinco colores, tamaño ajustable (50 % a 200 %) y posición vertical.
 - Historial Deshacer/Rehacer de hasta 30 estados para los ajustes admitidos.
-- Mezcla de varias pistas de audio en bucle, con volumen general y volumen individual.
+- Mezcla de varias pistas de audio en bucle, con volumen general, volumen individual y recorte independiente de inicio/fin por pista.
 - Control de volumen independiente para la vista previa.
 - Exportación MP4 a `Películas/DJ SEBAS CATCURTIS`.
 
