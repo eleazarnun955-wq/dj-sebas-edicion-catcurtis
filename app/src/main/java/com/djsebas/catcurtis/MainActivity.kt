@@ -36,10 +36,17 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -282,6 +289,13 @@ private fun EditorScreen() {
   }
   loaded.forEach { (uri, bitmap) -> thumbnails[uri] = bitmap }
  }
+ val photoMotionTransition = rememberInfiniteTransition(label = "photo-motion-preview")
+ val photoMotionProgress by photoMotionTransition.animateFloat(
+  initialValue = 0f,
+  targetValue = 1f,
+  animationSpec = infiniteRepeatable(animation = tween(durationMillis = 5000, easing = LinearEasing), repeatMode = RepeatMode.Reverse),
+  label = "photo-motion-progress"
+ )
  val player = remember { ExoPlayer.Builder(context).build() }
  LaunchedEffect(previewVolume) { player.volume = previewVolume }
  LaunchedEffect(selected, trimStart, trimEnd, selectedFilterMode) {
@@ -643,8 +657,24 @@ private fun EditorScreen() {
       Image(
        bitmap = photoBitmap.asImageBitmap(),
        contentDescription = "Vista previa de la fotografía seleccionada",
-       modifier = Modifier.fillMaxSize(),
-       contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+       modifier = Modifier.fillMaxSize().graphicsLayer {
+        val mode = selected?.uri?.let { photoMotionModes[it] } ?: "Sin movimiento"
+        val zoom = when (mode) {
+         "Zoom acercamiento" -> 1f + 0.14f * photoMotionProgress
+         "Zoom alejamiento" -> 1.14f - 0.14f * photoMotionProgress
+         "Paneo izquierda", "Paneo derecha", "Paneo vertical" -> 1.16f
+         else -> 1f
+        }
+        scaleX = zoom
+        scaleY = zoom
+        translationX = when (mode) {
+         "Paneo izquierda" -> size.width * (0.16f - 0.32f * photoMotionProgress)
+         "Paneo derecha" -> size.width * (-0.16f + 0.32f * photoMotionProgress)
+         else -> 0f
+        }
+        translationY = if (mode == "Paneo vertical") size.height * (0.16f - 0.32f * photoMotionProgress) else 0f
+       },
+       contentScale = androidx.compose.ui.layout.ContentScale.Crop,
        colorFilter = when (selectedFilterMode) {
         "Blanco y negro" -> androidx.compose.ui.graphics.ColorFilter.colorMatrix(androidx.compose.ui.graphics.ColorMatrix(floatArrayOf(0.213f,0.715f,0.072f,0f,0f,0.213f,0.715f,0.072f,0f,0f,0.213f,0.715f,0.072f,0f,0f,0f,0f,0f,1f,0f)))
         "Negativo" -> androidx.compose.ui.graphics.ColorFilter.colorMatrix(androidx.compose.ui.graphics.ColorMatrix(floatArrayOf(-1f,0f,0f,0f,255f,0f,-1f,0f,0f,255f,0f,0f,-1f,0f,255f,0f,0f,0f,1f,0f)))
