@@ -492,6 +492,23 @@ private fun EditorScreen() {
      Text("Selecciona un video o una foto de tu biblioteca", color = Color.Gray, fontSize = 11.sp)
     }
    }
+   if (titleText.isNotBlank()) {
+    val titleAlignment = when {
+     titleVerticalPosition < 0.4f -> Alignment.TopCenter
+     titleVerticalPosition > 0.65f -> Alignment.BottomCenter
+     else -> Alignment.Center
+    }
+    Text(
+     text = titleText,
+     color = Color(titleColor),
+     fontSize = (28f * titleScale).sp,
+     fontWeight = FontWeight.Bold,
+     modifier = Modifier.align(titleAlignment)
+      .padding(12.dp)
+      .background(Color.Black.copy(alpha = 0.38f), RoundedCornerShape(8.dp))
+      .padding(horizontal = 12.dp, vertical = 7.dp)
+    )
+   }
   }
   Spacer(Modifier.height(9.dp))
   Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("RECORTE DEL VIDEO SELECCIONADO", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp); Text(selected?.let { if (it.durationMs > 0) "${"%.1f".format((trimEnd-trimStart)/1000f)} s" else "Sin duración" } ?: "Sin selección", color = Accent, fontSize = 10.sp) }
@@ -519,7 +536,18 @@ private fun EditorScreen() {
   Spacer(Modifier.height(7.dp))
   Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
    ToolButton("Añadir", Icons.Default.Add) { picker.launch(arrayOf("video/*", "image/*", "audio/*")) }
-   ToolButton("Cortar", Icons.Default.ContentCut) { status = "Ajusta inicio y fin del clip seleccionado y exporta el proyecto" }
+   ToolButton("Aplicar corte", Icons.Default.ContentCut) {
+    val current = selected
+    if (current?.kind == "VIDEO") {
+     val start = trimStart.toLong().coerceAtLeast(0L)
+     val end = trimEnd.toLong().coerceAtMost(current.durationMs).coerceAtLeast(start + 1L)
+     if (end > start) {
+      saveTimelineState()
+      videoTrimRanges[current.uri] = start to end
+      status = "Recorte aplicado correctamente"
+     } else status = "Selecciona un rango válido para recortar"
+    } else status = "Selecciona primero un video y ajusta inicio y fin"
+   }
    ToolButton("Audio", Icons.Default.MusicNote) { picker.launch(arrayOf("audio/*")) }
    ToolButton("Fotos", Icons.Default.Photo) { picker.launch(arrayOf("image/*")) }
    ToolButton("Eliminar", Icons.Default.Delete) { selected?.let { saveTimelineState(); clips.remove(it); selected = clips.firstOrNull { c -> c.kind == "VIDEO" }; trimStart = 0f; trimEnd = selected?.durationMs?.coerceAtLeast(1L)?.toFloat() ?: 1f; status = "Elemento eliminado" } }
