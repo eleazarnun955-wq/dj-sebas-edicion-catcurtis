@@ -789,7 +789,7 @@ private fun EditorScreen() {
      ((range.second - range.first).coerceAtLeast(1000L) / 1000f)
     }
     val blockWidth = (durationSeconds * 17f).coerceIn(76f, 190f)
-    Box(Modifier.width(blockWidth.dp).fillMaxHeight().pointerInput(clip.uri, visualTrack.size) {
+    Box(Modifier.width(blockWidth.dp).fillMaxHeight().pointerInput(clip.uri, visualTrack.map { it.uri }) {
      var dragDistance = 0f
      detectDragGestures(onDrag = { change, dragAmount ->
       change.consume()
