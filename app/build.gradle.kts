@@ -2,7 +2,7 @@ plugins { id("com.android.application"); id("org.jetbrains.kotlin.android"); id(
 android {
  namespace = "com.djsebas.catcurtis"
  compileSdk = 35
- defaultConfig { applicationId = "com.djsebas.catcurtis.v129"; minSdk = 26; targetSdk = 35; versionCode = 32; versionName = "1.31.0" }
+ defaultConfig { applicationId = "com.djsebas.catcurtis.v131"; minSdk = 26; targetSdk = 35; versionCode = 33; versionName = "1.31.1" }
  buildFeatures { compose = true }
  compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
  kotlinOptions { jvmTarget = "17" }
