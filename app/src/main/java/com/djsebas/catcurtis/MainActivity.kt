@@ -64,6 +64,7 @@ import androidx.media3.effect.StaticOverlaySettings
 import androidx.media3.effect.TextOverlay
 import androidx.media3.effect.RgbFilter
 import androidx.media3.effect.RgbMatrix
+import androidx.media3.effect.MatrixTransformation
 import androidx.media3.transformer.ExportException
 import androidx.media3.transformer.ExportResult
 import androidx.media3.transformer.Transformer
@@ -82,6 +83,34 @@ private val Panel = Color(0xFF171724)
 private val Accent = Color(0xFFB64CFF)
 private data class Clip(val uri: Uri, val name: String, val kind: String, val durationMs: Long = 0L)
 private data class ClipTiming(val startMs: Long, val endMs: Long, val fadeInMs: Long, val fadeOutMs: Long)
+private fun createPhotoMotionEffect(mode: String, durationMs: Long): MatrixTransformation = MatrixTransformation { presentationTimeUs ->
+ val progress = (presentationTimeUs.toFloat() / (durationMs.coerceAtLeast(1L) * 1000f)).coerceIn(0f, 1f)
+ val matrix = android.graphics.Matrix()
+ when (mode) {
+  "Zoom acercamiento" -> {
+   val scale = 1f + 0.14f * progress
+   matrix.setScale(scale, scale)
+  }
+  "Zoom alejamiento" -> {
+   val scale = 1.14f - 0.14f * progress
+   matrix.setScale(scale, scale)
+  }
+  "Paneo izquierda" -> {
+   matrix.setScale(1.16f, 1.16f)
+   matrix.postTranslate(0.16f - 0.32f * progress, 0f)
+  }
+  "Paneo derecha" -> {
+   matrix.setScale(1.16f, 1.16f)
+   matrix.postTranslate(-0.16f + 0.32f * progress, 0f)
+  }
+  "Paneo vertical" -> {
+   matrix.setScale(1.16f, 1.16f)
+   matrix.postTranslate(0f, 0.16f - 0.32f * progress)
+  }
+ }
+ matrix
+}
+
 private data class EditorSnapshot(
  val clips: List<Clip>,
  val selectedUri: Uri?,
@@ -99,6 +128,7 @@ private data class EditorSnapshot(
  val audioTrackVolumes: Map<Uri, Float>,
  val audioTrimRanges: Map<Uri, Pair<Long, Long>>,
  val clipFilters: Map<Uri, String>,
+ val photoMotionModes: Map<Uri, String>,
  val clipTransitionDurationsMs: Map<Uri, Float>,
  val transitionDurationMs: Float
 )
@@ -137,6 +167,7 @@ private fun EditorScreen() {
  val audioTrackVolumes = remember { mutableStateMapOf<Uri, Float>() }
  val audioTrimRanges = remember { mutableStateMapOf<Uri, Pair<Long, Long>>() }
  val clipFilters = remember { mutableStateMapOf<Uri, String>() }
+ val photoMotionModes = remember { mutableStateMapOf<Uri, String>() }
  val clipTransitionDurationsMs = remember { mutableStateMapOf<Uri, Float>() }
  val selectedTransitionDurationMs = selected?.uri?.let { clipTransitionDurationsMs[it] } ?: transitionDurationMs
  val selectedFilterMode = selected?.uri?.let { clipFilters[it] } ?: filterMode
@@ -156,7 +187,7 @@ private fun EditorScreen() {
  fun captureEditorState() = EditorSnapshot(
   clips.toList(), selected?.uri, trimStart, trimEnd, titleText, filterMode,
   previewVolume, exportAudioVolume, photoDurationSeconds, titleScale, titleColor, titleVerticalPosition,
-  videoTrimRanges.toMap(), audioTrackVolumes.toMap(), audioTrimRanges.toMap(), clipFilters.toMap(), clipTransitionDurationsMs.toMap(), transitionDurationMs
+  videoTrimRanges.toMap(), audioTrackVolumes.toMap(), audioTrimRanges.toMap(), clipFilters.toMap(), photoMotionModes.toMap(), clipTransitionDurationsMs.toMap(), transitionDurationMs
  )
  fun saveTimelineState() {
   undoHistory.add(captureEditorState())
@@ -177,6 +208,7 @@ private fun EditorScreen() {
   audioTrackVolumes.clear(); audioTrackVolumes.putAll(snapshot.audioTrackVolumes)
   audioTrimRanges.clear(); audioTrimRanges.putAll(snapshot.audioTrimRanges)
   clipFilters.clear(); clipFilters.putAll(snapshot.clipFilters)
+  photoMotionModes.clear(); photoMotionModes.putAll(snapshot.photoMotionModes)
   clipTransitionDurationsMs.clear(); clipTransitionDurationsMs.putAll(snapshot.clipTransitionDurationsMs)
   transitionDurationMs = snapshot.transitionDurationMs
  }
@@ -343,6 +375,13 @@ private fun EditorScreen() {
       audioTrimRanges[uri] = start to end
      }
     }
+    photoMotionModes.clear()
+    val savedMotions = json.optJSONArray("photoMotionModes") ?: JSONArray()
+    for (i in 0 until savedMotions.length()) {
+     val item = savedMotions.optJSONObject(i) ?: continue
+     val uri = Uri.parse(item.optString("uri"))
+     if (clips.any { it.uri == uri && it.kind == "FOTO" }) photoMotionModes[uri] = item.optString("mode", "Sin movimiento")
+    }
     clipFilters.clear()
     val savedFilters = json.optJSONArray("clipFilters") ?: JSONArray()
     for (i in 0 until savedFilters.length()) {
@@ -366,7 +405,7 @@ private fun EditorScreen() {
  // Guarda los cambios después de una breve pausa para evitar escrituras en cada movimiento del control.
  LaunchedEffect(projectRestored, clips.toList(), selected?.uri, trimStart, trimEnd, titleText, filterMode,
   previewVolume, exportAudioVolume, photoDurationSeconds, transitionDurationMs, titleScale, titleColor, titleVerticalPosition,
-  videoTrimRanges.toMap(), audioTrackVolumes.toMap(), audioTrimRanges.toMap(), clipFilters.toMap(), clipTransitionDurationsMs.toMap()) {
+  videoTrimRanges.toMap(), audioTrackVolumes.toMap(), audioTrimRanges.toMap(), clipFilters.toMap(), photoMotionModes.toMap(), clipTransitionDurationsMs.toMap()) {
   if (projectRestored) {
    delay(350)
    val json = JSONObject()
@@ -399,6 +438,9 @@ private fun EditorScreen() {
    val filters = JSONArray()
    clipFilters.forEach { (uri, filter) -> filters.put(JSONObject().put("uri", uri.toString()).put("filter", filter)) }
    json.put("clipFilters", filters)
+   val motions = JSONArray()
+   photoMotionModes.forEach { (uri, mode) -> motions.put(JSONObject().put("uri", uri.toString()).put("mode", mode)) }
+   json.put("photoMotionModes", motions)
    val transitions = JSONArray()
    clipTransitionDurationsMs.forEach { (uri, duration) -> transitions.put(JSONObject().put("uri", uri.toString()).put("durationMs", duration.toDouble())) }
    json.put("clipTransitionDurationsMs", transitions)
@@ -472,7 +514,7 @@ private fun EditorScreen() {
    }
    val editedBuilder = EditedMediaItem.Builder(mediaBuilder.build())
    val clipFilterMode = clipFilters[video.uri] ?: filterMode
-   val videoEffects: List<androidx.media3.common.Effect> = when (clipFilterMode) {
+   val colorEffects: List<androidx.media3.common.Effect> = when (clipFilterMode) {
     "Blanco y negro" -> listOf(RgbFilter.createGrayscaleFilter())
     "Negativo" -> listOf(RgbFilter.createInvertedFilter())
     "Sepia" -> listOf(RgbMatrix { _, _ -> floatArrayOf(0.393f,0.349f,0.272f,0f,0.769f,0.686f,0.534f,0f,0.189f,0.168f,0.131f,0f,0f,0f,0f,1f) })
@@ -480,6 +522,11 @@ private fun EditorScreen() {
     "Frío" -> listOf(RgbMatrix { _, _ -> floatArrayOf(0.88f,0f,0f,0f,0f,1.02f,0f,0f,0f,0f,1.12f,0f,0f,0f,0f,1f) })
     else -> emptyList()
    }
+   val photoMotion = if (video.kind == "FOTO") {
+    val mode = photoMotionModes[video.uri] ?: "Sin movimiento"
+    if (mode == "Sin movimiento") null else createPhotoMotionEffect(mode, clipDurationsMs[index])
+   } else null
+   val videoEffects: List<androidx.media3.common.Effect> = colorEffects + listOfNotNull(photoMotion)
    val overlays = if (titleText.isNotBlank()) {
     val styledTitle = SpannableString(titleText.trim()).apply {
      setSpan(ForegroundColorSpan(titleColor), 0, length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
@@ -694,6 +741,16 @@ private fun EditorScreen() {
       labelColor = Color.LightGray
      )
     )
+   }
+  }
+  if (selected?.kind == "FOTO") {
+   val motionOptions = listOf("Sin movimiento", "Zoom acercamiento", "Zoom alejamiento", "Paneo izquierda", "Paneo derecha", "Paneo vertical")
+   Text("ANIMACIÓN DE FOTOGRAFÍA • MOVIMIENTO KEN BURNS", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+   Text("Movimiento real aplicado durante la exportación; elige cómo se mueve esta foto.", color = Color.Gray, fontSize = 9.sp)
+   Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    motionOptions.forEach { option ->
+     FilterChip(selected = (photoMotionModes[selected!!.uri] ?: "Sin movimiento") == option, onClick = { if ((photoMotionModes[selected!!.uri] ?: "Sin movimiento") != option) { saveTimelineState(); if (option == "Sin movimiento") photoMotionModes.remove(selected!!.uri) else photoMotionModes[selected!!.uri] = option; status = "Animación de foto: $option" } }, label = { Text(option, fontSize = 9.sp) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Accent, selectedLabelColor = Color.White, labelColor = Color.LightGray))
+    }
    }
   }
   Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
