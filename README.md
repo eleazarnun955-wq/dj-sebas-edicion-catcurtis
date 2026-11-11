@@ -16,6 +16,8 @@ Compilación: GitHub Actions genera un APK de depuración.
 - Vista previa de video con ExoPlayer y vista previa de fotografías.
 - Vista previa del título superpuesto con color, tamaño y posición seleccionados.
 - Guardado automático y restauración del último proyecto local, sujeto a que Android conserve los permisos de los archivos importados.
+- Al eliminar un medio, la selección pasa al siguiente video o fotografía disponible y se limpian sus ajustes de audio/recorte asociados.
+- Confirmación del rango de recorte sin crear entradas duplicadas en el historial Deshacer/Rehacer.
 - Miniaturas de los medios visuales.
 - Línea de tiempo/lista de medios con selección, reordenamiento y eliminación.
 - Recorte de inicio y fin de cada video mediante controles de rango, con acción explícita para aplicar el corte.
@@ -32,7 +34,7 @@ Compilación: GitHub Actions genera un APK de depuración.
 
 - Pruebas completas de exportación con combinaciones reales de videos, fotos y varias pistas de audio.
 - Verificación en un teléfono físico Android, incluyendo el Moto G24 del usuario.
-- Persistencia y recuperación de proyectos/drafts después de cerrar la aplicación.
+- Administración de varios proyectos independientes con nombres y guardado manual (actualmente se conserva automáticamente el último proyecto).
 - Fotogramas clave, animación avanzada, subtítulos automáticos, control de velocidad y biblioteca ampliada de efectos/transiciones.
 - Verificar en dispositivo el rendimiento, compatibilidad de códecs y estabilidad con archivos largos.
 
