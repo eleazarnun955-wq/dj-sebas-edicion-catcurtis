@@ -4,8 +4,9 @@ Editor de video Android independiente, con interfaz oscura y herramientas locale
 
 ## Estado actual
 
-Versión de código: **1.27.0**  
-Paquete Android: `com.djsebas.catcurtis`  
+Versión de código: **1.29.0**  
+Paquete Android de esta compilación independiente: `com.djsebas.catcurtis.v129`  
+El paquete anterior `com.djsebas.catcurtis` se conserva como aplicación separada.  
 SDK mínimo: Android 8.0 (API 26)  
 Compilación: GitHub Actions genera un APK de depuración.
 
