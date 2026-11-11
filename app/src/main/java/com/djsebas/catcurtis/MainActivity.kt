@@ -96,7 +96,8 @@ private data class EditorSnapshot(
  val titleColor: Int,
  val titleVerticalPosition: Float,
  val videoTrimRanges: Map<Uri, Pair<Long, Long>>,
- val audioTrackVolumes: Map<Uri, Float>
+ val audioTrackVolumes: Map<Uri, Float>,
+ val transitionDurationMs: Float
 )
 
 class MainActivity : ComponentActivity() {
@@ -124,6 +125,7 @@ private fun EditorScreen() {
  var previewVolume by remember { mutableFloatStateOf(1f) }
  var exportAudioVolume by remember { mutableFloatStateOf(1f) }
   var photoDurationSeconds by remember { mutableFloatStateOf(5f) }
+ var transitionDurationMs by remember { mutableFloatStateOf(500f) }
  var titleScale by remember { mutableFloatStateOf(1f) }
  var titleColor by remember { mutableIntStateOf(AndroidColor.WHITE) }
  var titleVerticalPosition by remember { mutableFloatStateOf(0.78f) }
@@ -143,8 +145,8 @@ private fun EditorScreen() {
 
  fun captureEditorState() = EditorSnapshot(
   clips.toList(), selected?.uri, trimStart, trimEnd, titleText, filterMode,
-  previewVolume, exportAudioVolume, photoDurationSeconds, titleScale, titleColor, titleVerticalPosition,
-  videoTrimRanges.toMap(), audioTrackVolumes.toMap()
+  previewVolume, exportAudioVolume, photoDurationSeconds, transitionDurationMs, titleScale, titleColor, titleVerticalPosition,
+  videoTrimRanges.toMap(), audioTrackVolumes.toMap(), transitionDurationMs
  )
  fun saveTimelineState() {
   undoHistory.add(captureEditorState())
@@ -163,6 +165,7 @@ private fun EditorScreen() {
   titleVerticalPosition = snapshot.titleVerticalPosition
   videoTrimRanges.clear(); videoTrimRanges.putAll(snapshot.videoTrimRanges)
   audioTrackVolumes.clear(); audioTrackVolumes.putAll(snapshot.audioTrackVolumes)
+  transitionDurationMs = snapshot.transitionDurationMs
  }
  fun undoTimeline() {
   if (undoHistory.isNotEmpty()) {
@@ -289,6 +292,7 @@ private fun EditorScreen() {
     previewVolume = json.optDouble("previewVolume", 1.0).toFloat().coerceIn(0f, 1f)
     exportAudioVolume = json.optDouble("exportAudioVolume", 1.0).toFloat().coerceIn(0f, 1f)
     photoDurationSeconds = json.optDouble("photoDurationSeconds", 5.0).toFloat().coerceIn(1f, 15f)
+    transitionDurationMs = json.optDouble("transitionDurationMs", 500.0).toFloat().coerceIn(0f, 2000f)
     titleScale = json.optDouble("titleScale", 1.0).toFloat().coerceIn(0.5f, 2f)
     titleColor = json.optInt("titleColor", AndroidColor.WHITE)
     titleVerticalPosition = json.optDouble("titleVerticalPosition", 0.78).toFloat().coerceIn(0.15f, 0.85f)
@@ -314,7 +318,7 @@ private fun EditorScreen() {
 
  // Guarda los cambios después de una breve pausa para evitar escrituras en cada movimiento del control.
  LaunchedEffect(projectRestored, clips.toList(), selected?.uri, trimStart, trimEnd, titleText, filterMode,
-  previewVolume, exportAudioVolume, photoDurationSeconds, titleScale, titleColor, titleVerticalPosition,
+  previewVolume, exportAudioVolume, photoDurationSeconds, transitionDurationMs, titleScale, titleColor, titleVerticalPosition,
   videoTrimRanges.toMap(), audioTrackVolumes.toMap()) {
   if (projectRestored) {
    delay(350)
@@ -332,6 +336,7 @@ private fun EditorScreen() {
    json.put("previewVolume", previewVolume.toDouble())
    json.put("exportAudioVolume", exportAudioVolume.toDouble())
    json.put("photoDurationSeconds", photoDurationSeconds.toDouble())
+   json.put("transitionDurationMs", transitionDurationMs.toDouble())
    json.put("titleScale", titleScale.toDouble())
    json.put("titleColor", titleColor)
    json.put("titleVerticalPosition", titleVerticalPosition.toDouble())
@@ -368,7 +373,7 @@ private fun EditorScreen() {
     }
    }
    val overlaps = (0 until (durations.size - 1)).sumOf { index ->
-    minOf(500L, durations[index] / 2L, durations[index + 1] / 2L)
+    minOf(transitionDurationMs.toLong().coerceAtLeast(0L), durations[index] / 2L, durations[index + 1] / 2L)
    }
    return durations.sum() - overlaps
   }
@@ -394,7 +399,7 @@ private fun EditorScreen() {
    }
   }
   val overlapDurationsMs = (0 until (visualClips.size - 1)).map { index ->
-   minOf(500L, clipDurationsMs[index] / 2L, clipDurationsMs[index + 1] / 2L)
+   minOf(transitionDurationMs.toLong().coerceAtLeast(0L), clipDurationsMs[index] / 2L, clipDurationsMs[index + 1] / 2L)
   }
   val clipTimings = mutableListOf<ClipTiming>()
   var timelineEndMs = 0L
@@ -628,7 +633,13 @@ private fun EditorScreen() {
     )
    }
   }
-  Text("TRANSICIÓN AUTOMÁTICA: fundido cruzado de hasta 0.5 s entre clips (se aplica al exportar).", color = Color.Gray, fontSize = 9.sp)
+  Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+   Text("DURACIÓN DE TRANSICIÓN", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+   Spacer(Modifier.weight(1f))
+   Text(if (transitionDurationMs == 0f) "Corte" else "${"%.1f".format(transitionDurationMs / 1000f)} s", color = Accent, fontSize = 11.sp)
+  }
+  Slider(value = transitionDurationMs, onValueChange = { transitionDurationMs = it }, valueRange = 0f..2000f, steps = 19, modifier = Modifier.fillMaxWidth())
+  Text("Elige corte directo o fundido cruzado de hasta 2 segundos. Se aplica al exportar.", color = Color.Gray, fontSize = 9.sp)
   Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Text("VOLUMEN DE VISTA PREVIA", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp); Spacer(Modifier.weight(1f)); Text("${(previewVolume * 100).toInt()}%", color = Accent, fontSize = 11.sp) }
   Slider(value = previewVolume, onValueChange = { if (!previewVolumeHistorySaved) { saveTimelineState(); previewVolumeHistorySaved = true }; previewVolume = it }, valueRange = 0f..1f, modifier = Modifier.fillMaxWidth(), onValueChangeFinished = { previewVolumeHistorySaved = false })
   Text("Este control ajusta únicamente la vista previa.", color = Color.Gray, fontSize = 9.sp)
