@@ -145,6 +145,7 @@ private fun EditorScreen() {
  var exportVolumeHistorySaved by remember { mutableStateOf(false) }
  var trackVolumeHistorySaved by remember { mutableStateOf(false) }
  var photoDurationHistorySaved by remember { mutableStateOf(false) }
+ var transitionHistorySaved by remember { mutableStateOf(false) }
  var titleHistorySaved by remember { mutableStateOf(false) }
  val worker = remember { Executors.newSingleThreadExecutor() }
  val mainHandler = remember { Handler(Looper.getMainLooper()) }
@@ -667,7 +668,7 @@ private fun EditorScreen() {
    Spacer(Modifier.weight(1f))
    Text(if (selectedTransitionDurationMs == 0f) "Corte" else "${"%.1f".format(selectedTransitionDurationMs / 1000f)} s", color = Accent, fontSize = 11.sp)
   }
-  Slider(value = selectedTransitionDurationMs, onValueChange = { value -> saveTimelineState(); val current = selected; if (current != null && (current.kind == "VIDEO" || current.kind == "FOTO")) clipTransitionDurationsMs[current.uri] = value else transitionDurationMs = value }, valueRange = 0f..2000f, steps = 19, modifier = Modifier.fillMaxWidth())
+  Slider(value = selectedTransitionDurationMs, onValueChange = { value -> if (!transitionHistorySaved) { saveTimelineState(); transitionHistorySaved = true }; val current = selected; if (current != null && (current.kind == "VIDEO" || current.kind == "FOTO")) clipTransitionDurationsMs[current.uri] = value else transitionDurationMs = value }, valueRange = 0f..2000f, steps = 19, modifier = Modifier.fillMaxWidth(), onValueChangeFinished = { transitionHistorySaved = false })
   Text(if (selected?.kind == "VIDEO" || selected?.kind == "FOTO") "Transición desde el clip seleccionado hacia el siguiente; hasta 2 segundos." else "Duración general de transición para los clips sin ajuste individual.", color = Color.Gray, fontSize = 9.sp)
   Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Text("VOLUMEN DE VISTA PREVIA", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp); Spacer(Modifier.weight(1f)); Text("${(previewVolume * 100).toInt()}%", color = Accent, fontSize = 11.sp) }
   Slider(value = previewVolume, onValueChange = { if (!previewVolumeHistorySaved) { saveTimelineState(); previewVolumeHistorySaved = true }; previewVolume = it }, valueRange = 0f..1f, modifier = Modifier.fillMaxWidth(), onValueChangeFinished = { previewVolumeHistorySaved = false })
