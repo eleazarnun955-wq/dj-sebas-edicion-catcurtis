@@ -358,7 +358,34 @@ private fun EditorScreen() {
   val output = File(context.cacheDir, "catcurtis_${System.currentTimeMillis()}.mp4")
   val sequenceItems = mutableListOf<EditedMediaItem>()
   val audioDurationMs = clips.firstOrNull { it.kind == "AUDIO" && it.durationMs > 0L }?.durationMs ?: 0L
-  val autoPhotoDurationMs = if (audioDurationMs > 0L && visualClips.isNotEmpty() && visualClips.all { it.kind == "FOTO" }) ((audioDurationMs + 500L * (visualClips.size - 1)) / visualClips.size).coerceAtLeast(1L) else (photoDurationSeconds * 1000f).toLong().coerceAtLeast(1L)
+  val photoCount = visualClips.count { it.kind == "FOTO" }
+  fun slideshowDuration(photoMs: Long): Long {
+   val durations = visualClips.map { clip ->
+    if (clip.kind == "FOTO") photoMs.coerceAtLeast(1L)
+    else {
+     val range = videoTrimRanges[clip.uri] ?: (0L to clip.durationMs)
+     (range.second - range.first).coerceAtLeast(1L)
+    }
+   }
+   val overlaps = (0 until (durations.size - 1)).sumOf { index ->
+    minOf(500L, durations[index] / 2L, durations[index + 1] / 2L)
+   }
+   return durations.sum() - overlaps
+  }
+  val autoPhotoDurationMs = if (audioDurationMs > 0L && photoCount > 0) {
+   var low = 1L
+   var high = (audioDurationMs + visualClips.sumOf { clip ->
+    if (clip.kind == "VIDEO") {
+     val range = videoTrimRanges[clip.uri] ?: (0L to clip.durationMs)
+     (range.second - range.first).coerceAtLeast(1L)
+    } else 0L
+   } + 500L * visualClips.size).coerceAtLeast(1L)
+   while (low < high) {
+    val middle = low + (high - low) / 2L
+    if (slideshowDuration(middle) < audioDurationMs) low = middle + 1L else high = middle
+   }
+   listOf(low, (low - 1L).coerceAtLeast(1L)).minBy { kotlin.math.abs(slideshowDuration(it) - audioDurationMs) }
+  } else (photoDurationSeconds * 1000f).toLong().coerceAtLeast(1L)
   val clipDurationsMs = visualClips.map { video ->
    if (video.kind == "FOTO") autoPhotoDurationMs
    else {
@@ -642,8 +669,8 @@ private fun EditorScreen() {
    modifier = Modifier.fillMaxWidth(),
    onValueChangeFinished = { photoDurationHistorySaved = false }
   )
-  val hasAutoPhotoAudio = clips.any { it.kind == "AUDIO" && it.durationMs > 0L } && clips.any { it.kind == "FOTO" } && clips.filter { it.kind == "VIDEO" || it.kind == "FOTO" }.all { it.kind == "FOTO" }
-  Text(if (hasAutoPhotoAudio) "AJUSTE AUTOMÁTICO ACTIVO: la duración total de las fotos coincidirá con la duración de la música." else "Elige cuánto tiempo aparece cada fotografía al exportar. Importa una canción para ajustar automáticamente la duración de tus fotos.", color = if (hasAutoPhotoAudio) Accent else Color.Gray, fontSize = 9.sp)
+  val hasAutoPhotoAudio = clips.any { it.kind == "AUDIO" && it.durationMs > 0L } && clips.any { it.kind == "FOTO" }
+  Text(if (hasAutoPhotoAudio) "AJUSTE AUTOMÁTICO ACTIVO: las fotos se distribuyen para que el montaje coincida lo más posible con la duración de la música, incluso si mezclas videos.", color = Accent, fontSize = 9.sp) else "Elige cuánto tiempo aparece cada fotografía al exportar. Importa una canción para ajustar automáticamente la duración de tus fotos.", color = Color.Gray, fontSize = 9.sp)
   Text("TÍTULO SOBRE EL VIDEO", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
   OutlinedTextField(
    value = titleText,
