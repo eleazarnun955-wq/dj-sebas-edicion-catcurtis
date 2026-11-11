@@ -114,6 +114,11 @@ private fun createPhotoMotionEffect(mode: String, durationMs: Long): MatrixTrans
    matrix.setScale(1.16f, 1.16f)
    matrix.postTranslate(0f, 0.16f - 0.32f * progress)
   }
+  "Zoom + paneo" -> {
+   val scale = 1.08f + 0.08f * progress
+   matrix.setScale(scale, scale)
+   matrix.postTranslate(-0.10f + 0.20f * progress, 0f)
+  }
  }
  matrix
 }
@@ -663,6 +668,7 @@ private fun EditorScreen() {
          "Zoom acercamiento" -> 1f + 0.14f * photoMotionProgress
          "Zoom alejamiento" -> 1.14f - 0.14f * photoMotionProgress
          "Paneo izquierda", "Paneo derecha", "Paneo vertical" -> 1.16f
+          "Zoom + paneo" -> 1.08f + 0.08f * photoMotionProgress
          else -> 1f
         }
         scaleX = zoom
@@ -755,7 +761,7 @@ private fun EditorScreen() {
    }
    ToolButton("Audio", Icons.Default.MusicNote) { picker.launch(arrayOf("audio/*")) }
    ToolButton("Fotos", Icons.Default.Photo) { picker.launch(arrayOf("image/*")) }
-   ToolButton("Eliminar", Icons.Default.Delete) { selected?.let { removed -> saveTimelineState(); clips.remove(removed); videoTrimRanges.remove(removed.uri); audioTrackVolumes.remove(removed.uri); audioTrimRanges.remove(removed.uri); clipFilters.remove(removed.uri); clipTransitionDurationsMs.remove(removed.uri); selected = clips.firstOrNull { c -> c.kind == "VIDEO" || c.kind == "FOTO" }; val range = selected?.let { videoTrimRanges[it.uri] }; trimStart = (range?.first ?: 0L).toFloat(); trimEnd = (range?.second ?: selected?.durationMs?.takeIf { it > 0L } ?: 1L).toFloat(); status = "Elemento eliminado" } }
+   ToolButton("Eliminar", Icons.Default.Delete) { selected?.let { removed -> saveTimelineState(); clips.remove(removed); videoTrimRanges.remove(removed.uri); audioTrackVolumes.remove(removed.uri); audioTrimRanges.remove(removed.uri); clipFilters.remove(removed.uri); photoMotionModes.remove(removed.uri); clipTransitionDurationsMs.remove(removed.uri); selected = clips.firstOrNull { c -> c.kind == "VIDEO" || c.kind == "FOTO" }; val range = selected?.let { videoTrimRanges[it.uri] }; trimStart = (range?.first ?: 0L).toFloat(); trimEnd = (range?.second ?: selected?.durationMs?.takeIf { it > 0L } ?: 1L).toFloat(); status = "Elemento eliminado" } }
   }
   Spacer(Modifier.height(10.dp))
   Text("FILTROS DE FOTO Y VIDEO", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
@@ -774,7 +780,7 @@ private fun EditorScreen() {
    }
   }
   if (selected?.kind == "FOTO") {
-   val motionOptions = listOf("Sin movimiento", "Zoom acercamiento", "Zoom alejamiento", "Paneo izquierda", "Paneo derecha", "Paneo vertical")
+   val motionOptions = listOf("Sin movimiento", "Zoom acercamiento", "Zoom alejamiento", "Paneo izquierda", "Paneo derecha", "Paneo vertical", "Zoom + paneo")
    Text("ANIMACIÓN DE FOTOGRAFÍA • MOVIMIENTO KEN BURNS", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
    Text("Movimiento real aplicado durante la exportación; elige cómo se mueve esta foto.", color = Color.Gray, fontSize = 9.sp)
    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
