@@ -4,8 +4,8 @@ Editor de video Android independiente, con interfaz oscura y herramientas locale
 
 ## Estado actual
 
-Versión de código: **1.36.0**  
-Paquete Android de esta edición independiente: `com.djsebas.catcurtis`  
+Versión de código: **1.37.0**  
+Paquete Android de esta edición independiente: `com.djsebas.catcurtis.installfix`  
 Esta edición usa un identificador propio para instalarse separada de las otras aplicaciones DJ Sebas.  
 SDK mínimo: Android 8.0 (API 26)  
 Compilación: GitHub Actions genera y publica un APK de depuración; la compilación no sustituye las pruebas funcionales en un dispositivo real.
@@ -24,6 +24,7 @@ Compilación: GitHub Actions genera y publica un APK de depuración; la compilac
 - Lista de medios con selección, reordenamiento y eliminación.
 - Recorte de inicio y fin de cada video mediante controles de rango, con acción explícita para aplicar el corte.
 - Duración ajustable de fotografías (1 a 15 segundos).
+- Animación de fotografías durante la exportación con movimientos Ken Burns: zoom de acercamiento/alejamiento y paneos horizontal/vertical. Cada ajuste se guarda por fotografía y participa en Deshacer/Rehacer.
 - Transición de fundido cruzado ajustable por clip (de corte directo a 2 segundos), con ajuste general alternativo, durante la exportación.
 - Filtros de foto y video por clip: original, blanco y negro, negativo, sepia, cálido y frío; se guardan con el proyecto y se aplican también a la exportación.
 - Título superpuesto con texto editable, cinco colores, tamaño ajustable (50 % a 200 %) y posición vertical.
@@ -37,6 +38,7 @@ Compilación: GitHub Actions genera y publica un APK de depuración; la compilac
 - Pruebas completas de exportación con combinaciones reales de videos, fotos y varias pistas de audio.
 - Verificación en un teléfono físico Android, incluyendo el Moto G24 del usuario.
 - Administración de varios proyectos independientes con nombres y guardado manual (actualmente se conserva automáticamente el último proyecto).
+- Integración directa con el motor de Ani/Anijam (no hay API pública documentada confirmada; por ahora se pueden importar a la línea de tiempo los videos/escenas generados externamente).
 - Fotogramas clave, animación avanzada, subtítulos automáticos, control de velocidad y biblioteca ampliada de efectos/transiciones.
 - Verificar en dispositivo el rendimiento, compatibilidad de códecs y estabilidad con archivos largos.
 
