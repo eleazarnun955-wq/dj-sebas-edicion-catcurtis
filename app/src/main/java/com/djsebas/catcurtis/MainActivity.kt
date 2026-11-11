@@ -97,6 +97,7 @@ private data class EditorSnapshot(
  val titleVerticalPosition: Float,
  val videoTrimRanges: Map<Uri, Pair<Long, Long>>,
  val audioTrackVolumes: Map<Uri, Float>,
+ val clipFilters: Map<Uri, String>,
  val transitionDurationMs: Float
 )
 
@@ -132,6 +133,8 @@ private fun EditorScreen() {
  var titlePositionHistorySaved by remember { mutableStateOf(false) }
  var titleScaleHistorySaved by remember { mutableStateOf(false) }
  val audioTrackVolumes = remember { mutableStateMapOf<Uri, Float>() }
+ val clipFilters = remember { mutableStateMapOf<Uri, String>() }
+ val selectedFilterMode = selected?.uri?.let { clipFilters[it] } ?: filterMode
  val videoTrimRanges = remember { mutableStateMapOf<Uri, Pair<Long, Long>>() }
  var exporting by remember { mutableStateOf(false) }
  var trimHistorySaved by remember { mutableStateOf(false) }
@@ -146,7 +149,7 @@ private fun EditorScreen() {
  fun captureEditorState() = EditorSnapshot(
   clips.toList(), selected?.uri, trimStart, trimEnd, titleText, filterMode,
   previewVolume, exportAudioVolume, photoDurationSeconds, titleScale, titleColor, titleVerticalPosition,
-  videoTrimRanges.toMap(), audioTrackVolumes.toMap(), transitionDurationMs
+  videoTrimRanges.toMap(), audioTrackVolumes.toMap(), clipFilters.toMap(), transitionDurationMs
  )
  fun saveTimelineState() {
   undoHistory.add(captureEditorState())
@@ -165,6 +168,7 @@ private fun EditorScreen() {
   titleVerticalPosition = snapshot.titleVerticalPosition
   videoTrimRanges.clear(); videoTrimRanges.putAll(snapshot.videoTrimRanges)
   audioTrackVolumes.clear(); audioTrackVolumes.putAll(snapshot.audioTrackVolumes)
+  clipFilters.clear(); clipFilters.putAll(snapshot.clipFilters)
   transitionDurationMs = snapshot.transitionDurationMs
  }
  fun undoTimeline() {
@@ -238,14 +242,14 @@ private fun EditorScreen() {
  }
  val player = remember { ExoPlayer.Builder(context).build() }
  LaunchedEffect(previewVolume) { player.volume = previewVolume }
- LaunchedEffect(selected, trimStart, trimEnd, filterMode) {
+ LaunchedEffect(selected, trimStart, trimEnd, selectedFilterMode) {
   selected?.takeIf { it.kind == "VIDEO" }?.let { clip ->
    val start = trimStart.toLong().coerceAtLeast(0L)
    val end = trimEnd.toLong().coerceAtLeast(start + 1L)
    val item = MediaItem.Builder().setUri(clip.uri).setClippingConfiguration(
     MediaItem.ClippingConfiguration.Builder().setStartPositionMs(start).setEndPositionMs(end).build()
    ).build()
-   player.setVideoEffects(when (filterMode) {
+   player.setVideoEffects(when (selectedFilterMode) {
     "Blanco y negro" -> listOf(RgbFilter.createGrayscaleFilter())
     "Negativo" -> listOf(RgbFilter.createInvertedFilter())
     "Sepia" -> listOf(RgbMatrix { _, _ -> floatArrayOf(0.393f,0.349f,0.272f,0f,0.769f,0.686f,0.534f,0f,0.189f,0.168f,0.131f,0f,0f,0f,0f,1f) })
@@ -310,6 +314,13 @@ private fun EditorScreen() {
      val uri = Uri.parse(item.optString("uri"))
      if (clips.any { it.uri == uri && it.kind == "AUDIO" }) audioTrackVolumes[uri] = item.optDouble("volume", 1.0).toFloat().coerceIn(0f, 1f)
     }
+    clipFilters.clear()
+    val savedFilters = json.optJSONArray("clipFilters") ?: JSONArray()
+    for (i in 0 until savedFilters.length()) {
+     val item = savedFilters.optJSONObject(i) ?: continue
+     val uri = Uri.parse(item.optString("uri"))
+     if (clips.any { it.uri == uri && (it.kind == "VIDEO" || it.kind == "FOTO") }) clipFilters[uri] = item.optString("filter", "Original")
+    }
     status = if (clips.isEmpty()) "Proyecto anterior: algunos archivos ya no tienen permiso" else "Proyecto anterior restaurado • ${clips.size} elementos"
    }.onFailure { status = "No se pudo recuperar el proyecto: ${it.message}" }
   }
@@ -319,7 +330,7 @@ private fun EditorScreen() {
  // Guarda los cambios después de una breve pausa para evitar escrituras en cada movimiento del control.
  LaunchedEffect(projectRestored, clips.toList(), selected?.uri, trimStart, trimEnd, titleText, filterMode,
   previewVolume, exportAudioVolume, photoDurationSeconds, transitionDurationMs, titleScale, titleColor, titleVerticalPosition,
-  videoTrimRanges.toMap(), audioTrackVolumes.toMap()) {
+  videoTrimRanges.toMap(), audioTrackVolumes.toMap(), clipFilters.toMap()) {
   if (projectRestored) {
    delay(350)
    val json = JSONObject()
@@ -346,6 +357,9 @@ private fun EditorScreen() {
    val volumes = JSONArray()
    audioTrackVolumes.forEach { (uri, volume) -> volumes.put(JSONObject().put("uri", uri.toString()).put("volume", volume.toDouble())) }
    json.put("audioTrackVolumes", volumes)
+   val filters = JSONArray()
+   clipFilters.forEach { (uri, filter) -> filters.put(JSONObject().put("uri", uri.toString()).put("filter", filter)) }
+   json.put("clipFilters", filters)
    context.getSharedPreferences("catcurtis_project", android.content.Context.MODE_PRIVATE).edit().putString("project_json", json.toString()).apply()
   }
  }
@@ -413,7 +427,8 @@ private fun EditorScreen() {
     )
    }
    val editedBuilder = EditedMediaItem.Builder(mediaBuilder.build())
-   val videoEffects: List<androidx.media3.common.Effect> = when (filterMode) {
+   val clipFilterMode = clipFilters[video.uri] ?: filterMode
+   val videoEffects: List<androidx.media3.common.Effect> = when (clipFilterMode) {
     "Blanco y negro" -> listOf(RgbFilter.createGrayscaleFilter())
     "Negativo" -> listOf(RgbFilter.createInvertedFilter())
     "Sepia" -> listOf(RgbMatrix { _, _ -> floatArrayOf(0.393f,0.349f,0.272f,0f,0.769f,0.686f,0.534f,0f,0.189f,0.168f,0.131f,0f,0f,0f,0f,1f) })
@@ -535,7 +550,7 @@ private fun EditorScreen() {
        contentDescription = "Vista previa de la fotografía seleccionada",
        modifier = Modifier.fillMaxSize(),
        contentScale = androidx.compose.ui.layout.ContentScale.Fit,
-       colorFilter = when (filterMode) {
+       colorFilter = when (selectedFilterMode) {
         "Blanco y negro" -> androidx.compose.ui.graphics.ColorFilter.colorMatrix(androidx.compose.ui.graphics.ColorMatrix(floatArrayOf(0.213f,0.715f,0.072f,0f,0f,0.213f,0.715f,0.072f,0f,0f,0.213f,0.715f,0.072f,0f,0f,0f,0f,0f,1f,0f)))
         "Negativo" -> androidx.compose.ui.graphics.ColorFilter.colorMatrix(androidx.compose.ui.graphics.ColorMatrix(floatArrayOf(-1f,0f,0f,0f,255f,0f,-1f,0f,0f,255f,0f,0f,-1f,0f,255f,0f,0f,0f,1f,0f)))
         "Sepia" -> androidx.compose.ui.graphics.ColorFilter.colorMatrix(androidx.compose.ui.graphics.ColorMatrix(floatArrayOf(0.393f,0.769f,0.189f,0f,0f,0.349f,0.686f,0.168f,0f,0f,0.272f,0.534f,0.131f,0f,0f,0f,0f,0f,1f,0f)))
@@ -615,15 +630,15 @@ private fun EditorScreen() {
    }
    ToolButton("Audio", Icons.Default.MusicNote) { picker.launch(arrayOf("audio/*")) }
    ToolButton("Fotos", Icons.Default.Photo) { picker.launch(arrayOf("image/*")) }
-   ToolButton("Eliminar", Icons.Default.Delete) { selected?.let { removed -> saveTimelineState(); clips.remove(removed); videoTrimRanges.remove(removed.uri); audioTrackVolumes.remove(removed.uri); selected = clips.firstOrNull { c -> c.kind == "VIDEO" || c.kind == "FOTO" }; val range = selected?.let { videoTrimRanges[it.uri] }; trimStart = (range?.first ?: 0L).toFloat(); trimEnd = (range?.second ?: selected?.durationMs?.takeIf { it > 0L } ?: 1L).toFloat(); status = "Elemento eliminado" } }
+   ToolButton("Eliminar", Icons.Default.Delete) { selected?.let { removed -> saveTimelineState(); clips.remove(removed); videoTrimRanges.remove(removed.uri); audioTrackVolumes.remove(removed.uri); clipFilters.remove(removed.uri); selected = clips.firstOrNull { c -> c.kind == "VIDEO" || c.kind == "FOTO" }; val range = selected?.let { videoTrimRanges[it.uri] }; trimStart = (range?.first ?: 0L).toFloat(); trimEnd = (range?.second ?: selected?.durationMs?.takeIf { it > 0L } ?: 1L).toFloat(); status = "Elemento eliminado" } }
   }
   Spacer(Modifier.height(10.dp))
   Text("FILTROS DE FOTO Y VIDEO", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
   Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
    listOf("Original", "Blanco y negro", "Negativo", "Sepia", "Cálido", "Frío").forEach { option ->
     FilterChip(
-     selected = filterMode == option,
-     onClick = { if (filterMode != option) { saveTimelineState(); filterMode = option } },
+     selected = selectedFilterMode == option,
+     onClick = { if (selectedFilterMode != option) { saveTimelineState(); val current = selected; if (current != null && (current.kind == "VIDEO" || current.kind == "FOTO")) clipFilters[current.uri] = option else filterMode = option } },
      label = { Text(option, fontSize = 10.sp) },
      colors = FilterChipDefaults.filterChipColors(
       selectedContainerColor = Accent,
