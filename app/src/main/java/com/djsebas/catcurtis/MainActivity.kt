@@ -71,6 +71,9 @@ import java.io.File
 import java.util.concurrent.Executors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
+import org.json.JSONArray
+import org.json.JSONObject
 
 private val Bg = Color(0xFF0B0B12)
 private val Panel = Color(0xFF171724)
@@ -106,6 +109,7 @@ class MainActivity : ComponentActivity() {
 private fun EditorScreen() {
  val context = LocalContext.current
  val clips = remember { mutableStateListOf<Clip>() }
+ var projectRestored by remember { mutableStateOf(false) }
  val thumbnails = remember { mutableStateMapOf<Uri, Bitmap>() }
  val undoHistory = remember { mutableStateListOf<EditorSnapshot>() }
  val redoHistory = remember { mutableStateListOf<EditorSnapshot>() }
@@ -231,7 +235,94 @@ private fun EditorScreen() {
    player.clearMediaItems()
   }
  }
+
  DisposableEffect(Unit) { onDispose { player.release(); worker.shutdown() } }
+
+ // Recupera el último proyecto local al abrir la aplicación.
+ LaunchedEffect(Unit) {
+  val prefs = context.getSharedPreferences("catcurtis_project", android.content.Context.MODE_PRIVATE)
+  val raw = prefs.getString("project_json", null)
+  if (!raw.isNullOrBlank()) {
+   runCatching {
+    val json = JSONObject(raw)
+    val grantedUris = context.contentResolver.persistedUriPermissions.filter { it.isReadPermission }.map { it.uri.toString() }.toSet()
+    val restoredClips = mutableListOf<Clip>()
+    val items = json.optJSONArray("clips") ?: JSONArray()
+    for (i in 0 until items.length()) {
+     val item = items.optJSONObject(i) ?: continue
+     val uriText = item.optString("uri")
+     val kind = item.optString("kind")
+     if (uriText.isNotBlank() && uriText in grantedUris && kind in setOf("VIDEO", "FOTO", "AUDIO")) {
+      restoredClips.add(Clip(Uri.parse(uriText), item.optString("name", "Medio importado"), kind, item.optLong("durationMs", 0L)))
+     }
+    }
+    clips.clear()
+    clips.addAll(restoredClips)
+    val selectedText = json.optString("selectedUri")
+    val selectedUri = selectedText.takeIf { it.isNotBlank() && it != "null" }?.let { Uri.parse(it) }
+    selected = clips.firstOrNull { it.uri == selectedUri } ?: clips.firstOrNull { it.kind == "VIDEO" || it.kind == "FOTO" }
+    trimStart = json.optDouble("trimStart", 0.0).toFloat()
+    trimEnd = json.optDouble("trimEnd", 1.0).toFloat()
+    titleText = json.optString("titleText", "")
+    filterMode = json.optString("filterMode", "Original")
+    previewVolume = json.optDouble("previewVolume", 1.0).toFloat().coerceIn(0f, 1f)
+    exportAudioVolume = json.optDouble("exportAudioVolume", 1.0).toFloat().coerceIn(0f, 1f)
+    photoDurationSeconds = json.optDouble("photoDurationSeconds", 5.0).toFloat().coerceIn(1f, 15f)
+    titleScale = json.optDouble("titleScale", 1.0).toFloat().coerceIn(0.5f, 2f)
+    titleColor = json.optInt("titleColor", AndroidColor.WHITE)
+    titleVerticalPosition = json.optDouble("titleVerticalPosition", 0.78).toFloat().coerceIn(0.15f, 0.85f)
+    videoTrimRanges.clear()
+    val trims = json.optJSONArray("videoTrimRanges") ?: JSONArray()
+    for (i in 0 until trims.length()) {
+     val item = trims.optJSONObject(i) ?: continue
+     val uri = Uri.parse(item.optString("uri"))
+     if (clips.any { it.uri == uri }) videoTrimRanges[uri] = item.optLong("start") to item.optLong("end")
+    }
+    audioTrackVolumes.clear()
+    val volumes = json.optJSONArray("audioTrackVolumes") ?: JSONArray()
+    for (i in 0 until volumes.length()) {
+     val item = volumes.optJSONObject(i) ?: continue
+     val uri = Uri.parse(item.optString("uri"))
+     if (clips.any { it.uri == uri && it.kind == "AUDIO" }) audioTrackVolumes[uri] = item.optDouble("volume", 1.0).toFloat().coerceIn(0f, 1f)
+    }
+    status = if (clips.isEmpty()) "Proyecto anterior: algunos archivos ya no tienen permiso" else "Proyecto anterior restaurado • ${clips.size} elementos"
+   }.onFailure { status = "No se pudo recuperar el proyecto: ${it.message}" }
+  }
+  projectRestored = true
+ }
+
+ // Guarda los cambios después de una breve pausa para evitar escrituras en cada movimiento del control.
+ LaunchedEffect(projectRestored, clips.toList(), selected?.uri, trimStart, trimEnd, titleText, filterMode,
+  previewVolume, exportAudioVolume, photoDurationSeconds, titleScale, titleColor, titleVerticalPosition,
+  videoTrimRanges.toMap(), audioTrackVolumes.toMap()) {
+  if (projectRestored) {
+   delay(350)
+   val json = JSONObject()
+   val items = JSONArray()
+   clips.forEach { clip ->
+    items.put(JSONObject().put("uri", clip.uri.toString()).put("name", clip.name).put("kind", clip.kind).put("durationMs", clip.durationMs))
+   }
+   json.put("clips", items)
+   json.put("selectedUri", selected?.uri?.toString())
+   json.put("trimStart", trimStart.toDouble())
+   json.put("trimEnd", trimEnd.toDouble())
+   json.put("titleText", titleText)
+   json.put("filterMode", filterMode)
+   json.put("previewVolume", previewVolume.toDouble())
+   json.put("exportAudioVolume", exportAudioVolume.toDouble())
+   json.put("photoDurationSeconds", photoDurationSeconds.toDouble())
+   json.put("titleScale", titleScale.toDouble())
+   json.put("titleColor", titleColor)
+   json.put("titleVerticalPosition", titleVerticalPosition.toDouble())
+   val trims = JSONArray()
+   videoTrimRanges.forEach { (uri, range) -> trims.put(JSONObject().put("uri", uri.toString()).put("start", range.first).put("end", range.second)) }
+   json.put("videoTrimRanges", trims)
+   val volumes = JSONArray()
+   audioTrackVolumes.forEach { (uri, volume) -> volumes.put(JSONObject().put("uri", uri.toString()).put("volume", volume.toDouble())) }
+   json.put("audioTrackVolumes", volumes)
+   context.getSharedPreferences("catcurtis_project", android.content.Context.MODE_PRIVATE).edit().putString("project_json", json.toString()).apply()
+  }
+ }
 
  fun exportVideo() {
   val visualClips = clips.filter { it.kind == "VIDEO" || it.kind == "FOTO" }
