@@ -246,6 +246,8 @@ private fun EditorScreen() {
     "Blanco y negro" -> listOf(RgbFilter.createGrayscaleFilter())
     "Negativo" -> listOf(RgbFilter.createInvertedFilter())
     "Sepia" -> listOf(RgbMatrix { _, _ -> floatArrayOf(0.393f,0.349f,0.272f,0f,0.769f,0.686f,0.534f,0f,0.189f,0.168f,0.131f,0f,0f,0f,0f,1f) })
+    "Cálido" -> listOf(RgbMatrix { _, _ -> floatArrayOf(1.12f,0f,0f,0f,0f,0f,1.02f,0f,0f,0f,0f,0f,0.88f,0f,0f,0f) })
+    "Frío" -> listOf(RgbMatrix { _, _ -> floatArrayOf(0.88f,0f,0f,0f,0f,0f,1.02f,0f,0f,0f,0f,0f,1.12f,0f,0f,0f) })
     else -> emptyList()
    })
    player.setMediaItem(item); player.prepare()
@@ -356,7 +358,7 @@ private fun EditorScreen() {
   val output = File(context.cacheDir, "catcurtis_${System.currentTimeMillis()}.mp4")
   val sequenceItems = mutableListOf<EditedMediaItem>()
   val audioDurationMs = clips.firstOrNull { it.kind == "AUDIO" && it.durationMs > 0L }?.durationMs ?: 0L
-  val autoPhotoDurationMs = if (audioDurationMs > 0L && visualClips.isNotEmpty() && visualClips.all { it.kind == "FOTO" }) (audioDurationMs / visualClips.size).coerceAtLeast(1L) else (photoDurationSeconds * 1000f).toLong().coerceAtLeast(1L)
+  val autoPhotoDurationMs = if (audioDurationMs > 0L && visualClips.isNotEmpty() && visualClips.all { it.kind == "FOTO" }) ((audioDurationMs + 500L * (visualClips.size - 1)) / visualClips.size).coerceAtLeast(1L) else (photoDurationSeconds * 1000f).toLong().coerceAtLeast(1L)
   val clipDurationsMs = visualClips.map { video ->
    if (video.kind == "FOTO") autoPhotoDurationMs
    else {
@@ -503,6 +505,8 @@ private fun EditorScreen() {
         "Blanco y negro" -> androidx.compose.ui.graphics.ColorFilter.colorMatrix(androidx.compose.ui.graphics.ColorMatrix(floatArrayOf(0.213f,0.715f,0.072f,0f,0f,0.213f,0.715f,0.072f,0f,0f,0.213f,0.715f,0.072f,0f,0f,0f,0f,0f,1f,0f)))
         "Negativo" -> androidx.compose.ui.graphics.ColorFilter.colorMatrix(androidx.compose.ui.graphics.ColorMatrix(floatArrayOf(-1f,0f,0f,0f,255f,0f,-1f,0f,0f,255f,0f,0f,-1f,0f,255f,0f,0f,0f,1f,0f)))
         "Sepia" -> androidx.compose.ui.graphics.ColorFilter.colorMatrix(androidx.compose.ui.graphics.ColorMatrix(floatArrayOf(0.393f,0.769f,0.189f,0f,0f,0.349f,0.686f,0.168f,0f,0f,0.272f,0.534f,0.131f,0f,0f,0f,0f,0f,1f,0f)))
+        "Cálido" -> androidx.compose.ui.graphics.ColorFilter.colorMatrix(androidx.compose.ui.graphics.ColorMatrix(floatArrayOf(1.12f,0f,0f,0f,0f,0f,1.02f,0f,0f,0f,0f,0f,0.88f,0f,0f,0f,0f,0f,1f,0f)))
+        "Frío" -> androidx.compose.ui.graphics.ColorFilter.colorMatrix(androidx.compose.ui.graphics.ColorMatrix(floatArrayOf(0.88f,0f,0f,0f,0f,0f,1.02f,0f,0f,0f,0f,0f,1.12f,0f,0f,0f,0f,0f,1f,0f)))
         else -> null
        }
       )
@@ -580,9 +584,9 @@ private fun EditorScreen() {
    ToolButton("Eliminar", Icons.Default.Delete) { selected?.let { removed -> saveTimelineState(); clips.remove(removed); videoTrimRanges.remove(removed.uri); audioTrackVolumes.remove(removed.uri); selected = clips.firstOrNull { c -> c.kind == "VIDEO" || c.kind == "FOTO" }; val range = selected?.let { videoTrimRanges[it.uri] }; trimStart = (range?.first ?: 0L).toFloat(); trimEnd = (range?.second ?: selected?.durationMs?.takeIf { it > 0L } ?: 1L).toFloat(); status = "Elemento eliminado" } }
   }
   Spacer(Modifier.height(10.dp))
-  Text("FILTRO DE VIDEO", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+  Text("FILTROS DE FOTO Y VIDEO", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
   Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-   listOf("Original", "Blanco y negro", "Negativo", "Sepia").forEach { option ->
+   listOf("Original", "Blanco y negro", "Negativo", "Sepia", "Cálido", "Frío").forEach { option ->
     FilterChip(
      selected = filterMode == option,
      onClick = { if (filterMode != option) { saveTimelineState(); filterMode = option } },
