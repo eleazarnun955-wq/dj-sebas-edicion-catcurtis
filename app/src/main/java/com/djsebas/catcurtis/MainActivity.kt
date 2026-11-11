@@ -200,14 +200,29 @@ private fun EditorScreen() {
   val loaded = withContext(Dispatchers.IO) {
    clips.filter { it.kind == "VIDEO" || it.kind == "FOTO" }.mapNotNull { clip ->
     val bitmap = runCatching {
+     // Primero solicita una miniatura al proveedor de Android; si falla, usa un decodificador alternativo.
      if (Build.VERSION.SDK_INT >= 29) {
-      context.contentResolver.loadThumbnail(clip.uri, Size(240, 160), null)
-     } else if (clip.kind == "VIDEO") {
+      runCatching { context.contentResolver.loadThumbnail(clip.uri, Size(480, 320), null) }.getOrNull()
+     } else null
+    }.getOrNull() ?: runCatching {
+     if (clip.kind == "VIDEO") {
       val retriever = MediaMetadataRetriever()
-      try { retriever.setDataSource(context, clip.uri); retriever.getFrameAtTime(0L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC) }
-      finally { retriever.release() }
+      try {
+       retriever.setDataSource(context, clip.uri)
+       retriever.getFrameAtTime(0L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+      } finally { retriever.release() }
      } else {
-      context.contentResolver.openInputStream(clip.uri)?.use { BitmapFactory.decodeStream(it) }
+      // Decodificación en dos pasos para evitar cargar fotografías enormes completas en memoria.
+      val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+      context.contentResolver.openInputStream(clip.uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+      val sample = BitmapFactory.Options().apply {
+       inSampleSize = if (bounds.outWidth > 0 && bounds.outHeight > 0) {
+        var factor = 1
+        while (bounds.outWidth / factor > 960 || bounds.outHeight / factor > 960) factor *= 2
+        factor
+       } else 1
+      }
+      context.contentResolver.openInputStream(clip.uri)?.use { BitmapFactory.decodeStream(it, null, sample) }
      }
     }.getOrNull()
     bitmap?.let { clip.uri to it }
