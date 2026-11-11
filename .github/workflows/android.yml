@@ -26,7 +26,7 @@ jobs:
           sha256sum app/build/outputs/apk/debug/app-debug.apk
       - uses: actions/upload-artifact@v5
         with:
-          name: DJ-SEBAS-EDICION-CATCURTIS-1.33.0
+          name: DJ-SEBAS-EDICION-CATCURTIS-1.34.0
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
