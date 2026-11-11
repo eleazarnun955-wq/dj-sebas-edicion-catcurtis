@@ -4,8 +4,8 @@ Editor de video Android independiente, con interfaz oscura y herramientas locale
 
 ## Estado actual
 
-Versión de código: **1.31.0**  
-Paquete Android de esta edición independiente: `com.djsebas.catcurtis.v129`  
+Versión de código: **1.31.1**  
+Paquete Android de esta edición independiente: `com.djsebas.catcurtis.v131`  
 La aplicación conserva su identificador `v129` para que las actualizaciones de esta misma edición se instalen sobre ella sin sustituir otras ediciones con identificadores distintos.  
 SDK mínimo: Android 8.0 (API 26)  
 Compilación: GitHub Actions genera y publica un APK de depuración; la compilación no sustituye las pruebas funcionales en un dispositivo real.
@@ -20,7 +20,8 @@ Compilación: GitHub Actions genera y publica un APK de depuración; la compilac
 - Al eliminar un medio, la selección pasa al siguiente video o fotografía disponible y se limpian sus ajustes de audio/recorte asociados.
 - Confirmación del rango de recorte sin crear entradas duplicadas en el historial Deshacer/Rehacer.
 - Miniaturas de los medios visuales.
-- Línea de tiempo/lista de medios con selección, reordenamiento y eliminación.
+- Línea de tiempo visual con carriles separados para video/fotografías y audio, bloques seleccionables y duración/volumen visibles.
+- Lista de medios con selección, reordenamiento y eliminación.
 - Recorte de inicio y fin de cada video mediante controles de rango, con acción explícita para aplicar el corte.
 - Duración ajustable de fotografías (1 a 15 segundos).
 - Transición de fundido cruzado de hasta 0.5 segundos durante la exportación.
