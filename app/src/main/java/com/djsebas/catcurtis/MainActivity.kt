@@ -335,6 +335,7 @@ private fun EditorScreen() {
   val transformer = Transformer.Builder(context).addListener(object : Transformer.Listener {
    override fun onCompleted(composition: Composition, exportResult: ExportResult) {
     worker.execute {
+     var savedUri: Uri? = null
      try {
       val values = ContentValues().apply {
        put(MediaStore.Video.Media.DISPLAY_NAME, "DJ_SEBAS_CATCURTIS_${System.currentTimeMillis()}.mp4")
@@ -342,10 +343,14 @@ private fun EditorScreen() {
        put(MediaStore.Video.Media.RELATIVE_PATH, Environment.DIRECTORY_MOVIES + "/DJ SEBAS CATCURTIS")
       }
       val target = context.contentResolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values) ?: error("No se pudo crear el archivo")
+      savedUri = target
       context.contentResolver.openOutputStream(target)?.use { out -> output.inputStream().use { it.copyTo(out) } } ?: error("No se pudo guardar")
       output.delete()
+      savedUri = null
       mainHandler.post { exporting = false; status = "¡Listo! Video guardado en Películas/DJ SEBAS CATCURTIS" }
      } catch (e: Exception) {
+      savedUri?.let { uri -> runCatching { context.contentResolver.delete(uri, null, null) } }
+      output.delete()
       mainHandler.post { exporting = false; status = "Error al guardar: ${e.message ?: "intenta otra vez"}" }
      }
     }
@@ -356,6 +361,7 @@ private fun EditorScreen() {
    }
   }).build()
   runCatching { transformer.start(composition, output.absolutePath) }.onFailure {
+   output.delete()
    exporting = false; status = "No se pudo iniciar: ${it.message}"
   }
  }
