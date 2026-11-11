@@ -145,7 +145,7 @@ private fun EditorScreen() {
 
  fun captureEditorState() = EditorSnapshot(
   clips.toList(), selected?.uri, trimStart, trimEnd, titleText, filterMode,
-  previewVolume, exportAudioVolume, photoDurationSeconds, transitionDurationMs, titleScale, titleColor, titleVerticalPosition,
+  previewVolume, exportAudioVolume, photoDurationSeconds, titleScale, titleColor, titleVerticalPosition,
   videoTrimRanges.toMap(), audioTrackVolumes.toMap(), transitionDurationMs
  )
  fun saveTimelineState() {
