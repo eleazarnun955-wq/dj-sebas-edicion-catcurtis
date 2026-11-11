@@ -88,6 +88,7 @@ private data class EditorSnapshot(
  val exportAudioVolume: Float,
  val photoDurationSeconds: Float,
  val titleScale: Float,
+ val titleColor: Int,
  val videoTrimRanges: Map<Uri, Pair<Long, Long>>,
  val audioTrackVolumes: Map<Uri, Float>
 )
@@ -117,6 +118,7 @@ private fun EditorScreen() {
  var exportAudioVolume by remember { mutableFloatStateOf(1f) }
   var photoDurationSeconds by remember { mutableFloatStateOf(5f) }
  var titleScale by remember { mutableFloatStateOf(1f) }
+ var titleColor by remember { mutableIntStateOf(AndroidColor.WHITE) }
  var titleScaleHistorySaved by remember { mutableStateOf(false) }
  val audioTrackVolumes = remember { mutableStateMapOf<Uri, Float>() }
  val videoTrimRanges = remember { mutableStateMapOf<Uri, Pair<Long, Long>>() }
@@ -132,7 +134,7 @@ private fun EditorScreen() {
 
  fun captureEditorState() = EditorSnapshot(
   clips.toList(), selected?.uri, trimStart, trimEnd, titleText, filterMode,
-  previewVolume, exportAudioVolume, photoDurationSeconds, titleScale,
+  previewVolume, exportAudioVolume, photoDurationSeconds, titleScale, titleColor,
   videoTrimRanges.toMap(), audioTrackVolumes.toMap()
  )
  fun saveTimelineState() {
@@ -148,6 +150,7 @@ private fun EditorScreen() {
   previewVolume = snapshot.previewVolume; exportAudioVolume = snapshot.exportAudioVolume
   photoDurationSeconds = snapshot.photoDurationSeconds
   titleScale = snapshot.titleScale
+  titleColor = snapshot.titleColor
   videoTrimRanges.clear(); videoTrimRanges.putAll(snapshot.videoTrimRanges)
   audioTrackVolumes.clear(); audioTrackVolumes.putAll(snapshot.audioTrackVolumes)
  }
@@ -267,7 +270,7 @@ private fun EditorScreen() {
    }
    val overlays = if (titleText.isNotBlank()) {
     val styledTitle = SpannableString(titleText.trim()).apply {
-     setSpan(ForegroundColorSpan(AndroidColor.WHITE), 0, length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+     setSpan(ForegroundColorSpan(titleColor), 0, length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
      setSpan(RelativeSizeSpan(titleScale), 0, length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
     }
     val titleSettings = StaticOverlaySettings.Builder()
@@ -511,6 +514,17 @@ private fun EditorScreen() {
    onValueChangeFinished = { titleScaleHistorySaved = false }
   )
   Text("Ajusta el tamaño del texto superpuesto al video.", color = Color.Gray, fontSize = 9.sp)
+  Text("COLOR DEL TÍTULO", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+  Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+   listOf("Blanco" to AndroidColor.WHITE, "Amarillo" to AndroidColor.YELLOW, "Rojo" to AndroidColor.RED, "Cian" to AndroidColor.CYAN, "Verde" to AndroidColor.GREEN).forEach { (label, value) ->
+    Column(Modifier.clickable { if (titleColor != value) { saveTimelineState(); titleColor = value } }, horizontalAlignment = Alignment.CenterHorizontally) {
+     Box(Modifier.size(25.dp).background(Color(value), RoundedCornerShape(50)).padding(2.dp), contentAlignment = Alignment.Center) {
+      if (titleColor == value) Icon(Icons.Default.Check, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+     }
+     Text(label, color = Color.LightGray, fontSize = 8.sp)
+    }
+   }
+  }
   Spacer(Modifier.height(10.dp))
   Row(verticalAlignment = Alignment.CenterVertically) { Text("LÍNEA DE TIEMPO • AJUSTA EL ORDEN", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp); Spacer(Modifier.weight(1f)); Text("${clips.size} elementos", color = Color.Gray, fontSize = 11.sp) }
   Spacer(Modifier.height(6.dp))
