@@ -98,6 +98,7 @@ private data class EditorSnapshot(
  val videoTrimRanges: Map<Uri, Pair<Long, Long>>,
  val audioTrackVolumes: Map<Uri, Float>,
  val clipFilters: Map<Uri, String>,
+ val clipTransitionDurationsMs: Map<Uri, Float>,
  val transitionDurationMs: Float
 )
 
@@ -134,6 +135,8 @@ private fun EditorScreen() {
  var titleScaleHistorySaved by remember { mutableStateOf(false) }
  val audioTrackVolumes = remember { mutableStateMapOf<Uri, Float>() }
  val clipFilters = remember { mutableStateMapOf<Uri, String>() }
+ val clipTransitionDurationsMs = remember { mutableStateMapOf<Uri, Float>() }
+ val selectedTransitionDurationMs = selected?.uri?.let { clipTransitionDurationsMs[it] } ?: transitionDurationMs
  val selectedFilterMode = selected?.uri?.let { clipFilters[it] } ?: filterMode
  val videoTrimRanges = remember { mutableStateMapOf<Uri, Pair<Long, Long>>() }
  var exporting by remember { mutableStateOf(false) }
@@ -149,7 +152,7 @@ private fun EditorScreen() {
  fun captureEditorState() = EditorSnapshot(
   clips.toList(), selected?.uri, trimStart, trimEnd, titleText, filterMode,
   previewVolume, exportAudioVolume, photoDurationSeconds, titleScale, titleColor, titleVerticalPosition,
-  videoTrimRanges.toMap(), audioTrackVolumes.toMap(), clipFilters.toMap(), transitionDurationMs
+  videoTrimRanges.toMap(), audioTrackVolumes.toMap(), clipFilters.toMap(), clipTransitionDurationsMs.toMap(), transitionDurationMs
  )
  fun saveTimelineState() {
   undoHistory.add(captureEditorState())
@@ -169,6 +172,7 @@ private fun EditorScreen() {
   videoTrimRanges.clear(); videoTrimRanges.putAll(snapshot.videoTrimRanges)
   audioTrackVolumes.clear(); audioTrackVolumes.putAll(snapshot.audioTrackVolumes)
   clipFilters.clear(); clipFilters.putAll(snapshot.clipFilters)
+  clipTransitionDurationsMs.clear(); clipTransitionDurationsMs.putAll(snapshot.clipTransitionDurationsMs)
   transitionDurationMs = snapshot.transitionDurationMs
  }
  fun undoTimeline() {
@@ -321,6 +325,13 @@ private fun EditorScreen() {
      val uri = Uri.parse(item.optString("uri"))
      if (clips.any { it.uri == uri && (it.kind == "VIDEO" || it.kind == "FOTO") }) clipFilters[uri] = item.optString("filter", "Original")
     }
+    clipTransitionDurationsMs.clear()
+    val savedTransitions = json.optJSONArray("clipTransitionDurationsMs") ?: JSONArray()
+    for (i in 0 until savedTransitions.length()) {
+     val item = savedTransitions.optJSONObject(i) ?: continue
+     val uri = Uri.parse(item.optString("uri"))
+     if (clips.any { it.uri == uri && (it.kind == "VIDEO" || it.kind == "FOTO") }) clipTransitionDurationsMs[uri] = item.optDouble("durationMs", 500.0).toFloat().coerceIn(0f, 2000f)
+    }
     status = if (clips.isEmpty()) "Proyecto anterior: algunos archivos ya no tienen permiso" else "Proyecto anterior restaurado • ${clips.size} elementos"
    }.onFailure { status = "No se pudo recuperar el proyecto: ${it.message}" }
   }
@@ -330,7 +341,7 @@ private fun EditorScreen() {
  // Guarda los cambios después de una breve pausa para evitar escrituras en cada movimiento del control.
  LaunchedEffect(projectRestored, clips.toList(), selected?.uri, trimStart, trimEnd, titleText, filterMode,
   previewVolume, exportAudioVolume, photoDurationSeconds, transitionDurationMs, titleScale, titleColor, titleVerticalPosition,
-  videoTrimRanges.toMap(), audioTrackVolumes.toMap(), clipFilters.toMap()) {
+  videoTrimRanges.toMap(), audioTrackVolumes.toMap(), clipFilters.toMap(), clipTransitionDurationsMs.toMap()) {
   if (projectRestored) {
    delay(350)
    val json = JSONObject()
@@ -360,6 +371,9 @@ private fun EditorScreen() {
    val filters = JSONArray()
    clipFilters.forEach { (uri, filter) -> filters.put(JSONObject().put("uri", uri.toString()).put("filter", filter)) }
    json.put("clipFilters", filters)
+   val transitions = JSONArray()
+   clipTransitionDurationsMs.forEach { (uri, duration) -> transitions.put(JSONObject().put("uri", uri.toString()).put("durationMs", duration.toDouble())) }
+   json.put("clipTransitionDurationsMs", transitions)
    context.getSharedPreferences("catcurtis_project", android.content.Context.MODE_PRIVATE).edit().putString("project_json", json.toString()).apply()
   }
  }
@@ -387,7 +401,7 @@ private fun EditorScreen() {
     }
    }
    val overlaps = (0 until (durations.size - 1)).sumOf { index ->
-    minOf(transitionDurationMs.toLong().coerceAtLeast(0L), durations[index] / 2L, durations[index + 1] / 2L)
+    minOf((clipTransitionDurationsMs[visualClips[index].uri] ?: transitionDurationMs).toLong().coerceAtLeast(0L), durations[index] / 2L, durations[index + 1] / 2L)
    }
    return durations.sum() - overlaps
   }
@@ -413,7 +427,7 @@ private fun EditorScreen() {
    }
   }
   val overlapDurationsMs = (0 until (visualClips.size - 1)).map { index ->
-   minOf(transitionDurationMs.toLong().coerceAtLeast(0L), clipDurationsMs[index] / 2L, clipDurationsMs[index + 1] / 2L)
+   minOf((clipTransitionDurationsMs[visualClips[index].uri] ?: transitionDurationMs).toLong().coerceAtLeast(0L), clipDurationsMs[index] / 2L, clipDurationsMs[index + 1] / 2L)
   }
   val clipTimings = mutableListOf<ClipTiming>()
   var timelineEndMs = 0L
@@ -630,7 +644,7 @@ private fun EditorScreen() {
    }
    ToolButton("Audio", Icons.Default.MusicNote) { picker.launch(arrayOf("audio/*")) }
    ToolButton("Fotos", Icons.Default.Photo) { picker.launch(arrayOf("image/*")) }
-   ToolButton("Eliminar", Icons.Default.Delete) { selected?.let { removed -> saveTimelineState(); clips.remove(removed); videoTrimRanges.remove(removed.uri); audioTrackVolumes.remove(removed.uri); clipFilters.remove(removed.uri); selected = clips.firstOrNull { c -> c.kind == "VIDEO" || c.kind == "FOTO" }; val range = selected?.let { videoTrimRanges[it.uri] }; trimStart = (range?.first ?: 0L).toFloat(); trimEnd = (range?.second ?: selected?.durationMs?.takeIf { it > 0L } ?: 1L).toFloat(); status = "Elemento eliminado" } }
+   ToolButton("Eliminar", Icons.Default.Delete) { selected?.let { removed -> saveTimelineState(); clips.remove(removed); videoTrimRanges.remove(removed.uri); audioTrackVolumes.remove(removed.uri); clipFilters.remove(removed.uri); clipTransitionDurationsMs.remove(removed.uri); selected = clips.firstOrNull { c -> c.kind == "VIDEO" || c.kind == "FOTO" }; val range = selected?.let { videoTrimRanges[it.uri] }; trimStart = (range?.first ?: 0L).toFloat(); trimEnd = (range?.second ?: selected?.durationMs?.takeIf { it > 0L } ?: 1L).toFloat(); status = "Elemento eliminado" } }
   }
   Spacer(Modifier.height(10.dp))
   Text("FILTROS DE FOTO Y VIDEO", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
@@ -651,10 +665,10 @@ private fun EditorScreen() {
   Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
    Text("DURACIÓN DE TRANSICIÓN", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
    Spacer(Modifier.weight(1f))
-   Text(if (transitionDurationMs == 0f) "Corte" else "${"%.1f".format(transitionDurationMs / 1000f)} s", color = Accent, fontSize = 11.sp)
+   Text(if (selectedTransitionDurationMs == 0f) "Corte" else "${"%.1f".format(selectedTransitionDurationMs / 1000f)} s", color = Accent, fontSize = 11.sp)
   }
-  Slider(value = transitionDurationMs, onValueChange = { transitionDurationMs = it }, valueRange = 0f..2000f, steps = 19, modifier = Modifier.fillMaxWidth())
-  Text("Elige corte directo o fundido cruzado de hasta 2 segundos. Se aplica al exportar.", color = Color.Gray, fontSize = 9.sp)
+  Slider(value = selectedTransitionDurationMs, onValueChange = { value -> saveTimelineState(); val current = selected; if (current != null && (current.kind == "VIDEO" || current.kind == "FOTO")) clipTransitionDurationsMs[current.uri] = value else transitionDurationMs = value }, valueRange = 0f..2000f, steps = 19, modifier = Modifier.fillMaxWidth())
+  Text(if (selected?.kind == "VIDEO" || selected?.kind == "FOTO") "Transición desde el clip seleccionado hacia el siguiente; hasta 2 segundos." else "Duración general de transición para los clips sin ajuste individual.", color = Color.Gray, fontSize = 9.sp)
   Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Text("VOLUMEN DE VISTA PREVIA", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp); Spacer(Modifier.weight(1f)); Text("${(previewVolume * 100).toInt()}%", color = Accent, fontSize = 11.sp) }
   Slider(value = previewVolume, onValueChange = { if (!previewVolumeHistorySaved) { saveTimelineState(); previewVolumeHistorySaved = true }; previewVolume = it }, valueRange = 0f..1f, modifier = Modifier.fillMaxWidth(), onValueChangeFinished = { previewVolumeHistorySaved = false })
   Text("Este control ajusta únicamente la vista previa.", color = Color.Gray, fontSize = 9.sp)
