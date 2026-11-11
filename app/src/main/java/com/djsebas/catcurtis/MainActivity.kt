@@ -662,15 +662,6 @@ private fun EditorScreen() {
    }
   }
   Spacer(Modifier.height(10.dp))
-  Row(Modifier.fillMaxWidth().background(Color(0xFF171720), RoundedCornerShape(12.dp)).padding(horizontal = 6.dp, vertical = 4.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-   listOf("Editar" to Icons.Default.ContentCut, "Audio" to Icons.Default.MusicNote, "Texto" to Icons.Default.TextFields, "Efectos" to Icons.Default.AutoAwesome, "Capas" to Icons.Default.Layers).forEach { (label, icon) ->
-    Column(Modifier.clickable { status = when(label) { "Audio" -> "Selecciona una pista de audio en la línea de tiempo"; "Texto" -> "Usa el panel de texto para editar el título"; "Efectos" -> "Selecciona un clip para aplicar filtros y movimiento"; "Capas" -> "Las pistas visuales y de audio aparecen en la línea de tiempo"; else -> "Selecciona un clip para editarlo" } }.padding(horizontal = 8.dp, vertical = 5.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-     Icon(icon, null, tint = Accent, modifier = Modifier.size(19.dp))
-     Text(label, color = Color.White, fontSize = 9.sp)
-    }
-   }
-  }
-  Spacer(Modifier.height(10.dp))
   Box(Modifier.fillMaxWidth().height(245.dp).background(Color.Black, RoundedCornerShape(18.dp)), contentAlignment = Alignment.Center) {
    when (selected?.kind) {
     "VIDEO" -> AndroidView(factory = { PlayerView(it).apply { this.player = player; useController = true } }, modifier = Modifier.fillMaxSize())
@@ -751,14 +742,6 @@ private fun EditorScreen() {
    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("Inicio ${"%.1f".format(trimStart/1000f)} s", color = Color.LightGray, fontSize = 10.sp); Text("Fin ${"%.1f".format(trimEnd/1000f)} s", color = Color.LightGray, fontSize = 10.sp) }
   } else Text("Selecciona un video para ajustar inicio y fin", color = Color.Gray, fontSize = 10.sp)
   Spacer(Modifier.height(9.dp))
-  Text("HERRAMIENTAS DE EDICIÓN", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-  Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-   ToolButton("Dividir", Icons.Default.CallSplit) { status = "Selecciona un punto de corte en el clip para dividirlo" }
-   ToolButton("Animación", Icons.Default.Animation) { status = if (selected?.kind == "FOTO") "Elige un movimiento de fotografía en el panel de animación" else "Selecciona una fotografía para animarla" }
-   ToolButton("Filtros", Icons.Default.Filter) { status = "Selecciona un filtro en el panel de filtros" }
-   ToolButton("Texto", Icons.Default.TextFields) { status = "Edita el título en el panel de texto" }
-   ToolButton("Audio", Icons.Default.MusicNote) { picker.launch(arrayOf("audio/*")) }
-  }
   Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
    Text("HERRAMIENTAS", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
    Spacer(Modifier.weight(1f))
