@@ -4,7 +4,7 @@ Editor de video Android independiente, con interfaz oscura y herramientas locale
 
 ## Estado actual
 
-Versión de código: **1.35.0**  
+Versión de código: **1.36.0**  
 Paquete Android de esta edición independiente: `com.djsebas.catcurtis`  
 Esta edición usa un identificador propio para instalarse separada de las otras aplicaciones DJ Sebas.  
 SDK mínimo: Android 8.0 (API 26)  
