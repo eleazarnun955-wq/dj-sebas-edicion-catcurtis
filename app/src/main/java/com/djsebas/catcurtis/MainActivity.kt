@@ -789,7 +789,26 @@ private fun EditorScreen() {
      ((range.second - range.first).coerceAtLeast(1000L) / 1000f)
     }
     val blockWidth = (durationSeconds * 17f).coerceIn(76f, 190f)
-    Box(Modifier.width(blockWidth.dp).fillMaxHeight().background(if (selected?.uri == clip.uri) Color(0xFF59347A) else Color(0xFF30213F), RoundedCornerShape(6.dp)).clickable {
+    Box(Modifier.width(blockWidth.dp).fillMaxHeight().pointerInput(clip.uri, visualTrack.size) {
+     var dragDistance = 0f
+     detectDragGestures(onDrag = { change, dragAmount ->
+      change.consume()
+      dragDistance += dragAmount.x
+      if (dragDistance > 34f || dragDistance < -34f) {
+       val fromVisual = visualTrack.indexOfFirst { it.uri == clip.uri }
+       val toVisual = (fromVisual + if (dragDistance > 0f) 1 else -1).coerceIn(0, visualTrack.lastIndex)
+       if (fromVisual != toVisual) {
+        saveTimelineState()
+        val movingIndex = clips.indexOfFirst { it.uri == clip.uri }
+        val targetIndex = clips.indexOfFirst { it.uri == visualTrack[toVisual].uri }
+        val moving = clips.removeAt(movingIndex)
+        clips.add(if (movingIndex < targetIndex) targetIndex - 1 else targetIndex, moving)
+        status = "Orden de la línea de tiempo actualizado"
+       }
+       dragDistance = 0f
+      }
+     })
+    }.background(if (selected?.uri == clip.uri) Color(0xFF59347A) else Color(0xFF30213F), RoundedCornerShape(6.dp)).clickable {
      selected = clip
      val range = videoTrimRanges[clip.uri] ?: (0L to clip.durationMs.coerceAtLeast(1L))
      trimStart = range.first.toFloat(); trimEnd = range.second.toFloat()
