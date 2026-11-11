@@ -670,7 +670,12 @@ private fun EditorScreen() {
    onValueChangeFinished = { photoDurationHistorySaved = false }
   )
   val hasAutoPhotoAudio = clips.any { it.kind == "AUDIO" && it.durationMs > 0L } && clips.any { it.kind == "FOTO" }
-  Text(if (hasAutoPhotoAudio) "AJUSTE AUTOMÁTICO ACTIVO: las fotos se distribuyen para que el montaje coincida lo más posible con la duración de la música, incluso si mezclas videos.", color = Accent, fontSize = 9.sp) else "Elige cuánto tiempo aparece cada fotografía al exportar. Importa una canción para ajustar automáticamente la duración de tus fotos.", color = Color.Gray, fontSize = 9.sp)
+  Text(
+   if (hasAutoPhotoAudio) "AJUSTE AUTOMÁTICO ACTIVO: las fotos se distribuyen para que el montaje coincida lo más posible con la duración de la música, incluso si mezclas videos."
+   else "Elige cuánto tiempo aparece cada fotografía al exportar. Importa una canción para ajustar automáticamente la duración de tus fotos.",
+   color = if (hasAutoPhotoAudio) Accent else Color.Gray,
+   fontSize = 9.sp
+  )
   Text("TÍTULO SOBRE EL VIDEO", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
   OutlinedTextField(
    value = titleText,
