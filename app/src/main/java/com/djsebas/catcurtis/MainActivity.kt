@@ -138,6 +138,7 @@ private data class EditorSnapshot(
  val titleVerticalPosition: Float,
  val videoTrimRanges: Map<Uri, Pair<Long, Long>>,
  val audioTrackVolumes: Map<Uri, Float>,
+ val audioTrackOffsetsMs: Map<Uri, Long>,
  val audioTrimRanges: Map<Uri, Pair<Long, Long>>,
  val clipFilters: Map<Uri, String>,
  val photoMotionModes: Map<Uri, String>,
@@ -178,6 +179,7 @@ private fun EditorScreen() {
  var titlePositionHistorySaved by remember { mutableStateOf(false) }
  var titleScaleHistorySaved by remember { mutableStateOf(false) }
  val audioTrackVolumes = remember { mutableStateMapOf<Uri, Float>() }
+ val audioTrackOffsetsMs = remember { mutableStateMapOf<Uri, Long>() }
  val audioTrimRanges = remember { mutableStateMapOf<Uri, Pair<Long, Long>>() }
  val clipFilters = remember { mutableStateMapOf<Uri, String>() }
  val photoMotionModes = remember { mutableStateMapOf<Uri, String>() }
@@ -200,7 +202,7 @@ private fun EditorScreen() {
  fun captureEditorState() = EditorSnapshot(
   clips.toList(), selected?.uri, trimStart, trimEnd, titleText, filterMode,
   previewVolume, exportAudioVolume, photoDurationSeconds, titleScale, titleColor, titleVerticalPosition,
-  videoTrimRanges.toMap(), audioTrackVolumes.toMap(), audioTrimRanges.toMap(), clipFilters.toMap(), photoMotionModes.toMap(), clipTransitionDurationsMs.toMap(), transitionDurationMs
+  videoTrimRanges.toMap(), audioTrackVolumes.toMap(), audioTrackOffsetsMs.toMap(), audioTrimRanges.toMap(), clipFilters.toMap(), photoMotionModes.toMap(), clipTransitionDurationsMs.toMap(), transitionDurationMs
  )
  fun saveTimelineState() {
   undoHistory.add(captureEditorState())
@@ -219,6 +221,7 @@ private fun EditorScreen() {
   titleVerticalPosition = snapshot.titleVerticalPosition
   videoTrimRanges.clear(); videoTrimRanges.putAll(snapshot.videoTrimRanges)
   audioTrackVolumes.clear(); audioTrackVolumes.putAll(snapshot.audioTrackVolumes)
+  audioTrackOffsetsMs.clear(); audioTrackOffsetsMs.putAll(snapshot.audioTrackOffsetsMs)
   audioTrimRanges.clear(); audioTrimRanges.putAll(snapshot.audioTrimRanges)
   clipFilters.clear(); clipFilters.putAll(snapshot.clipFilters)
   photoMotionModes.clear(); photoMotionModes.putAll(snapshot.photoMotionModes)
@@ -383,6 +386,13 @@ private fun EditorScreen() {
      val uri = Uri.parse(item.optString("uri"))
      if (clips.any { it.uri == uri && it.kind == "AUDIO" }) audioTrackVolumes[uri] = item.optDouble("volume", 1.0).toFloat().coerceIn(0f, 1f)
     }
+    audioTrackOffsetsMs.clear()
+    val offsets = json.optJSONArray("audioTrackOffsetsMs") ?: JSONArray()
+    for (i in 0 until offsets.length()) {
+     val item = offsets.optJSONObject(i) ?: continue
+     val uri = Uri.parse(item.optString("uri"))
+     if (clips.any { it.uri == uri && it.kind == "AUDIO" }) audioTrackOffsetsMs[uri] = item.optLong("offsetMs", 0L).coerceIn(0L, 600000L)
+    }
     audioTrimRanges.clear()
     val audioTrims = json.optJSONArray("audioTrimRanges") ?: JSONArray()
     for (i in 0 until audioTrims.length()) {
@@ -426,7 +436,7 @@ private fun EditorScreen() {
  // Guarda los cambios después de una breve pausa para evitar escrituras en cada movimiento del control.
  LaunchedEffect(projectRestored, clips.toList(), selected?.uri, trimStart, trimEnd, titleText, filterMode,
   previewVolume, exportAudioVolume, photoDurationSeconds, transitionDurationMs, titleScale, titleColor, titleVerticalPosition,
-  videoTrimRanges.toMap(), audioTrackVolumes.toMap(), audioTrimRanges.toMap(), clipFilters.toMap(), photoMotionModes.toMap(), clipTransitionDurationsMs.toMap()) {
+  videoTrimRanges.toMap(), audioTrackVolumes.toMap(), audioTrackOffsetsMs.toMap(), audioTrimRanges.toMap(), clipFilters.toMap(), photoMotionModes.toMap(), clipTransitionDurationsMs.toMap()) {
   if (projectRestored) {
    delay(350)
    val json = JSONObject()
@@ -453,6 +463,9 @@ private fun EditorScreen() {
    val volumes = JSONArray()
    audioTrackVolumes.forEach { (uri, volume) -> volumes.put(JSONObject().put("uri", uri.toString()).put("volume", volume.toDouble())) }
    json.put("audioTrackVolumes", volumes)
+   val offsets = JSONArray()
+   audioTrackOffsetsMs.forEach { (uri, offset) -> offsets.put(JSONObject().put("uri", uri.toString()).put("offsetMs", offset)) }
+   json.put("audioTrackOffsetsMs", offsets)
    val audioTrims = JSONArray()
    audioTrimRanges.forEach { (uri, range) -> audioTrims.put(JSONObject().put("uri", uri.toString()).put("start", range.first).put("end", range.second)) }
    json.put("audioTrimRanges", audioTrims)
@@ -592,7 +605,12 @@ private fun EditorScreen() {
    val audioItem = EditedMediaItem.Builder(audioMedia)
     .setEffects(Effects(listOf(audioProcessor), emptyList()))
     .build()
-   EditedMediaItemSequence.Builder(audioItem).setIsLooping(true).build()
+   EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_AUDIO)).apply {
+    val offsetMs = (audioTrackOffsetsMs[audioClip.uri] ?: 0L).coerceIn(0L, timelineEndMs)
+    if (offsetMs > 0L) addGap(offsetMs * 1000L)
+    addItem(audioItem)
+    setIsLooping(true)
+   }.build()
   }
   val compositorSettings = object : VideoCompositorSettings {
    override fun getOutputSize(inputSizes: List<Media3Size>): Media3Size = inputSizes.first()
