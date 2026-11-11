@@ -747,6 +747,48 @@ private fun EditorScreen() {
   Spacer(Modifier.height(10.dp))
   Row(verticalAlignment = Alignment.CenterVertically) { Text("LÍNEA DE TIEMPO • AJUSTA EL ORDEN", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp); Spacer(Modifier.weight(1f)); Text("${clips.size} elementos", color = Color.Gray, fontSize = 11.sp) }
   Spacer(Modifier.height(6.dp))
+  // Vista de montaje multipista: separa visualmente los clips y la música.
+  val visualTrack = clips.filter { it.kind == "VIDEO" || it.kind == "FOTO" }
+  val audioTrack = clips.filter { it.kind == "AUDIO" }
+  Text("VIDEO Y FOTOGRAFÍAS", color = Color(0xFFBDA0FF), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+  Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).height(78.dp).background(Color(0xFF11111B), RoundedCornerShape(9.dp)).padding(5.dp), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+   if (visualTrack.isEmpty()) Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { Text("Agrega fotos o videos para crear tu montaje", color = Color.Gray, fontSize = 10.sp) }
+   visualTrack.forEachIndexed { index, clip ->
+    val durationSeconds = if (clip.kind == "FOTO") photoDurationSeconds else {
+     val range = videoTrimRanges[clip.uri] ?: (0L to clip.durationMs)
+     ((range.second - range.first).coerceAtLeast(1000L) / 1000f)
+    }
+    val blockWidth = (durationSeconds * 17f).coerceIn(76f, 190f)
+    Box(Modifier.width(blockWidth.dp).fillMaxHeight().background(if (selected?.uri == clip.uri) Color(0xFF59347A) else Color(0xFF30213F), RoundedCornerShape(6.dp)).clickable {
+     selected = clip
+     val range = videoTrimRanges[clip.uri] ?: (0L to clip.durationMs.coerceAtLeast(1L))
+     trimStart = range.first.toFloat(); trimEnd = range.second.toFloat()
+    }.padding(4.dp)) {
+     val thumb = thumbnails[clip.uri]
+     if (thumb != null) Image(bitmap = thumb.asImageBitmap(), contentDescription = clip.name, modifier = Modifier.fillMaxSize(), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
+     Column(Modifier.align(Alignment.BottomStart).fillMaxWidth().background(Color.Black.copy(alpha = 0.68f), RoundedCornerShape(3.dp)).padding(horizontal = 4.dp, vertical = 2.dp)) {
+      Text("${index + 1}. ${clip.kind}", color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+      Text("${"%.1f".format(durationSeconds)} s", color = Color.White, fontSize = 8.sp)
+     }
+    }
+   }
+  }
+  Text("MÚSICA Y AUDIO", color = Color(0xFF83D8B5), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+  Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).height(54.dp).background(Color(0xFF11111B), RoundedCornerShape(9.dp)).padding(5.dp), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+   if (audioTrack.isEmpty()) Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { Text("Agrega una canción o pista de audio", color = Color.Gray, fontSize = 10.sp) }
+   audioTrack.forEachIndexed { index, clip ->
+    val blockWidth = ((clip.durationMs / 1000f) * 13f).coerceIn(90f, 240f)
+    Row(Modifier.width(blockWidth.dp).fillMaxHeight().background(if (selected?.uri == clip.uri) Color(0xFF205D4A) else Color(0xFF174735), RoundedCornerShape(6.dp)).clickable { selected = clip }.padding(horizontal = 7.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+     Icon(Icons.Default.MusicNote, null, tint = Color(0xFF9AF0C8), modifier = Modifier.size(18.dp))
+     Spacer(Modifier.width(5.dp))
+     Column(Modifier.weight(1f)) {
+      Text("${index + 1}. ${clip.name}", color = Color.White, fontSize = 9.sp, maxLines = 1)
+      Text("${"%.1f".format(clip.durationMs / 1000f)} s • ${((audioTrackVolumes[clip.uri] ?: 1f) * 100).toInt()}%", color = Color(0xFFB6E8D2), fontSize = 8.sp)
+     }
+    }
+   }
+  }
+  Text("Selecciona cualquier bloque para editarlo; usa la lista inferior para cambiar el orden de los clips.", color = Color.Gray, fontSize = 9.sp)
   Row(Modifier.fillMaxWidth().height(105.dp).background(Panel, RoundedCornerShape(12.dp)).padding(7.dp)) {
    if (clips.isEmpty()) Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { Text("＋ Agrega videos, fotos o música. Videos y fotos se exportan en orden.", color = Color.Gray, fontSize = 12.sp) }
    else LazyColumn(verticalArrangement = Arrangement.spacedBy(5.dp)) { items(clips) { clip ->
