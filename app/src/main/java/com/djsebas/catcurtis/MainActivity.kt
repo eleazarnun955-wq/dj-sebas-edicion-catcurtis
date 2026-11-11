@@ -151,7 +151,7 @@ private fun EditorScreen() {
  }
  fun restoreTimeline(snapshot: EditorSnapshot) {
   clips.clear(); clips.addAll(snapshot.clips)
-  selected = clips.firstOrNull { it.uri == snapshot.selectedUri } ?: clips.firstOrNull { it.kind == "VIDEO" }
+  selected = clips.firstOrNull { it.uri == snapshot.selectedUri } ?: clips.firstOrNull { it.kind == "VIDEO" || it.kind == "FOTO" }
   trimStart = snapshot.trimStart; trimEnd = snapshot.trimEnd
   titleText = snapshot.titleText; filterMode = snapshot.filterMode
   previewVolume = snapshot.previewVolume; exportAudioVolume = snapshot.exportAudioVolume
@@ -536,21 +536,20 @@ private fun EditorScreen() {
   Spacer(Modifier.height(7.dp))
   Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
    ToolButton("Añadir", Icons.Default.Add) { picker.launch(arrayOf("video/*", "image/*", "audio/*")) }
-   ToolButton("Aplicar corte", Icons.Default.ContentCut) {
+   ToolButton("Confirmar corte", Icons.Default.ContentCut) {
     val current = selected
     if (current?.kind == "VIDEO") {
      val start = trimStart.toLong().coerceAtLeast(0L)
      val end = trimEnd.toLong().coerceAtMost(current.durationMs).coerceAtLeast(start + 1L)
      if (end > start) {
-      saveTimelineState()
       videoTrimRanges[current.uri] = start to end
-      status = "Recorte aplicado correctamente"
+      status = "Recorte confirmado: se usará al exportar"
      } else status = "Selecciona un rango válido para recortar"
     } else status = "Selecciona primero un video y ajusta inicio y fin"
    }
    ToolButton("Audio", Icons.Default.MusicNote) { picker.launch(arrayOf("audio/*")) }
    ToolButton("Fotos", Icons.Default.Photo) { picker.launch(arrayOf("image/*")) }
-   ToolButton("Eliminar", Icons.Default.Delete) { selected?.let { saveTimelineState(); clips.remove(it); selected = clips.firstOrNull { c -> c.kind == "VIDEO" }; trimStart = 0f; trimEnd = selected?.durationMs?.coerceAtLeast(1L)?.toFloat() ?: 1f; status = "Elemento eliminado" } }
+   ToolButton("Eliminar", Icons.Default.Delete) { selected?.let { removed -> saveTimelineState(); clips.remove(removed); videoTrimRanges.remove(removed.uri); audioTrackVolumes.remove(removed.uri); selected = clips.firstOrNull { c -> c.kind == "VIDEO" || c.kind == "FOTO" }; val range = selected?.let { videoTrimRanges[it.uri] }; trimStart = (range?.first ?: 0L).toFloat(); trimEnd = (range?.second ?: selected?.durationMs?.takeIf { it > 0L } ?: 1L).toFloat(); status = "Elemento eliminado" } }
   }
   Spacer(Modifier.height(10.dp))
   Text("FILTRO DE VIDEO", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
