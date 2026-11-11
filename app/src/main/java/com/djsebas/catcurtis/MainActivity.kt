@@ -97,6 +97,7 @@ private data class EditorSnapshot(
  val titleVerticalPosition: Float,
  val videoTrimRanges: Map<Uri, Pair<Long, Long>>,
  val audioTrackVolumes: Map<Uri, Float>,
+ val audioTrimRanges: Map<Uri, Pair<Long, Long>>,
  val clipFilters: Map<Uri, String>,
  val clipTransitionDurationsMs: Map<Uri, Float>,
  val transitionDurationMs: Float
@@ -134,6 +135,7 @@ private fun EditorScreen() {
  var titlePositionHistorySaved by remember { mutableStateOf(false) }
  var titleScaleHistorySaved by remember { mutableStateOf(false) }
  val audioTrackVolumes = remember { mutableStateMapOf<Uri, Float>() }
+ val audioTrimRanges = remember { mutableStateMapOf<Uri, Pair<Long, Long>>() }
  val clipFilters = remember { mutableStateMapOf<Uri, String>() }
  val clipTransitionDurationsMs = remember { mutableStateMapOf<Uri, Float>() }
  val selectedTransitionDurationMs = selected?.uri?.let { clipTransitionDurationsMs[it] } ?: transitionDurationMs
@@ -144,6 +146,7 @@ private fun EditorScreen() {
  var previewVolumeHistorySaved by remember { mutableStateOf(false) }
  var exportVolumeHistorySaved by remember { mutableStateOf(false) }
  var trackVolumeHistorySaved by remember { mutableStateOf(false) }
+ var audioTrimHistorySaved by remember { mutableStateOf(false) }
  var photoDurationHistorySaved by remember { mutableStateOf(false) }
  var transitionHistorySaved by remember { mutableStateOf(false) }
  var titleHistorySaved by remember { mutableStateOf(false) }
@@ -153,7 +156,7 @@ private fun EditorScreen() {
  fun captureEditorState() = EditorSnapshot(
   clips.toList(), selected?.uri, trimStart, trimEnd, titleText, filterMode,
   previewVolume, exportAudioVolume, photoDurationSeconds, titleScale, titleColor, titleVerticalPosition,
-  videoTrimRanges.toMap(), audioTrackVolumes.toMap(), clipFilters.toMap(), clipTransitionDurationsMs.toMap(), transitionDurationMs
+  videoTrimRanges.toMap(), audioTrackVolumes.toMap(), audioTrimRanges.toMap(), clipFilters.toMap(), clipTransitionDurationsMs.toMap(), transitionDurationMs
  )
  fun saveTimelineState() {
   undoHistory.add(captureEditorState())
@@ -172,6 +175,7 @@ private fun EditorScreen() {
   titleVerticalPosition = snapshot.titleVerticalPosition
   videoTrimRanges.clear(); videoTrimRanges.putAll(snapshot.videoTrimRanges)
   audioTrackVolumes.clear(); audioTrackVolumes.putAll(snapshot.audioTrackVolumes)
+  audioTrimRanges.clear(); audioTrimRanges.putAll(snapshot.audioTrimRanges)
   clipFilters.clear(); clipFilters.putAll(snapshot.clipFilters)
   clipTransitionDurationsMs.clear(); clipTransitionDurationsMs.putAll(snapshot.clipTransitionDurationsMs)
   transitionDurationMs = snapshot.transitionDurationMs
@@ -206,6 +210,7 @@ private fun EditorScreen() {
    val clip = Clip(uri, uri.lastPathSegment?.substringAfterLast('/')?.take(28) ?: "Medio importado", kind, duration)
    clips.add(clip)
    if (kind == "VIDEO") videoTrimRanges[uri] = 0L to duration.coerceAtLeast(1L)
+   if (kind == "AUDIO") audioTrimRanges[uri] = 0L to duration.coerceAtLeast(1L)
    if (selected == null && (kind == "VIDEO" || kind == "FOTO")) { selected = clip; trimStart = 0f; trimEnd = if (kind == "VIDEO") duration.coerceAtLeast(1L).toFloat() else 1f }
   }
   val audioDuration = clips.firstOrNull { it.kind == "AUDIO" && it.durationMs > 0L }?.durationMs ?: 0L
@@ -319,6 +324,13 @@ private fun EditorScreen() {
      val uri = Uri.parse(item.optString("uri"))
      if (clips.any { it.uri == uri && it.kind == "AUDIO" }) audioTrackVolumes[uri] = item.optDouble("volume", 1.0).toFloat().coerceIn(0f, 1f)
     }
+    audioTrimRanges.clear()
+    val audioTrims = json.optJSONArray("audioTrimRanges") ?: JSONArray()
+    for (i in 0 until audioTrims.length()) {
+     val item = audioTrims.optJSONObject(i) ?: continue
+     val uri = Uri.parse(item.optString("uri"))
+     if (clips.any { it.uri == uri && it.kind == "AUDIO" }) audioTrimRanges[uri] = item.optLong("start") to item.optLong("end")
+    }
     clipFilters.clear()
     val savedFilters = json.optJSONArray("clipFilters") ?: JSONArray()
     for (i in 0 until savedFilters.length()) {
@@ -342,7 +354,7 @@ private fun EditorScreen() {
  // Guarda los cambios después de una breve pausa para evitar escrituras en cada movimiento del control.
  LaunchedEffect(projectRestored, clips.toList(), selected?.uri, trimStart, trimEnd, titleText, filterMode,
   previewVolume, exportAudioVolume, photoDurationSeconds, transitionDurationMs, titleScale, titleColor, titleVerticalPosition,
-  videoTrimRanges.toMap(), audioTrackVolumes.toMap(), clipFilters.toMap(), clipTransitionDurationsMs.toMap()) {
+  videoTrimRanges.toMap(), audioTrackVolumes.toMap(), audioTrimRanges.toMap(), clipFilters.toMap(), clipTransitionDurationsMs.toMap()) {
   if (projectRestored) {
    delay(350)
    val json = JSONObject()
@@ -369,6 +381,9 @@ private fun EditorScreen() {
    val volumes = JSONArray()
    audioTrackVolumes.forEach { (uri, volume) -> volumes.put(JSONObject().put("uri", uri.toString()).put("volume", volume.toDouble())) }
    json.put("audioTrackVolumes", volumes)
+   val audioTrims = JSONArray()
+   audioTrimRanges.forEach { (uri, range) -> audioTrims.put(JSONObject().put("uri", uri.toString()).put("start", range.first).put("end", range.second)) }
+   json.put("audioTrimRanges", audioTrims)
    val filters = JSONArray()
    clipFilters.forEach { (uri, filter) -> filters.put(JSONObject().put("uri", uri.toString()).put("filter", filter)) }
    json.put("clipFilters", filters)
@@ -391,7 +406,9 @@ private fun EditorScreen() {
   status = "Preparando ${visualClips.size} clip(s) de video/foto… no cierres la aplicación"
   val output = File(context.cacheDir, "catcurtis_${System.currentTimeMillis()}.mp4")
   val sequenceItems = mutableListOf<EditedMediaItem>()
-  val audioDurationMs = clips.firstOrNull { it.kind == "AUDIO" && it.durationMs > 0L }?.durationMs ?: 0L
+  val firstAudio = clips.firstOrNull { it.kind == "AUDIO" && it.durationMs > 0L }
+  val firstAudioRange = firstAudio?.let { audioTrimRanges[it.uri] ?: (0L to it.durationMs) }
+  val audioDurationMs = firstAudioRange?.let { (it.second - it.first).coerceAtLeast(0L) } ?: 0L
   val photoCount = visualClips.count { it.kind == "FOTO" }
   fun slideshowDuration(photoMs: Long): Long {
    val durations = visualClips.map { clip ->
@@ -488,7 +505,11 @@ private fun EditorScreen() {
      ChannelMixingMatrix.createForConstantPower(channelCount, channelCount).scaleBy(exportAudioVolume * (audioTrackVolumes[audioClip.uri] ?: 1f))
     )
    }
-   val audioItem = EditedMediaItem.Builder(MediaItem.fromUri(audioClip.uri))
+   val audioRange = audioTrimRanges[audioClip.uri] ?: (0L to audioClip.durationMs)
+   val audioMedia = MediaItem.Builder().setUri(audioClip.uri).setClippingConfiguration(
+    MediaItem.ClippingConfiguration.Builder().setStartPositionMs(audioRange.first.coerceAtLeast(0L)).setEndPositionMs(audioRange.second.coerceAtLeast(audioRange.first + 1L)).build()
+   ).build()
+   val audioItem = EditedMediaItem.Builder(audioMedia)
     .setEffects(Effects(listOf(audioProcessor), emptyList()))
     .build()
    EditedMediaItemSequence.Builder(audioItem).setIsLooping(true).build()
@@ -645,7 +666,7 @@ private fun EditorScreen() {
    }
    ToolButton("Audio", Icons.Default.MusicNote) { picker.launch(arrayOf("audio/*")) }
    ToolButton("Fotos", Icons.Default.Photo) { picker.launch(arrayOf("image/*")) }
-   ToolButton("Eliminar", Icons.Default.Delete) { selected?.let { removed -> saveTimelineState(); clips.remove(removed); videoTrimRanges.remove(removed.uri); audioTrackVolumes.remove(removed.uri); clipFilters.remove(removed.uri); clipTransitionDurationsMs.remove(removed.uri); selected = clips.firstOrNull { c -> c.kind == "VIDEO" || c.kind == "FOTO" }; val range = selected?.let { videoTrimRanges[it.uri] }; trimStart = (range?.first ?: 0L).toFloat(); trimEnd = (range?.second ?: selected?.durationMs?.takeIf { it > 0L } ?: 1L).toFloat(); status = "Elemento eliminado" } }
+   ToolButton("Eliminar", Icons.Default.Delete) { selected?.let { removed -> saveTimelineState(); clips.remove(removed); videoTrimRanges.remove(removed.uri); audioTrackVolumes.remove(removed.uri); audioTrimRanges.remove(removed.uri); clipFilters.remove(removed.uri); clipTransitionDurationsMs.remove(removed.uri); selected = clips.firstOrNull { c -> c.kind == "VIDEO" || c.kind == "FOTO" }; val range = selected?.let { videoTrimRanges[it.uri] }; trimStart = (range?.first ?: 0L).toFloat(); trimEnd = (range?.second ?: selected?.durationMs?.takeIf { it > 0L } ?: 1L).toFloat(); status = "Elemento eliminado" } }
   }
   Spacer(Modifier.height(10.dp))
   Text("FILTROS DE FOTO Y VIDEO", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
@@ -696,6 +717,19 @@ private fun EditorScreen() {
     onValueChangeFinished = { trackVolumeHistorySaved = false }
    )
    Text("Selecciona una pista de audio en la línea de tiempo para ajustar su volumen por separado.", color = Color.Gray, fontSize = 9.sp)
+   if (selectedAudio.durationMs > 0L) {
+    val audioRange = audioTrimRanges[selectedAudio.uri] ?: (0L to selectedAudio.durationMs)
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+     Text("RECORTE DE ESTA PISTA", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+     Spacer(Modifier.weight(1f))
+     Text("${"%.1f".format((audioRange.second - audioRange.first) / 1000f)} s", color = Accent, fontSize = 11.sp)
+    }
+    RangeSlider(value = audioRange.first.toFloat().coerceAtLeast(0f)..audioRange.second.toFloat().coerceAtMost(selectedAudio.durationMs.toFloat()), onValueChange = { range ->
+     if (!audioTrimHistorySaved) { saveTimelineState(); audioTrimHistorySaved = true }
+     audioTrimRanges[selectedAudio.uri] = range.start.toLong() to range.endInclusive.toLong()
+    }, valueRange = 0f..selectedAudio.durationMs.toFloat(), modifier = Modifier.fillMaxWidth(), onValueChangeFinished = { audioTrimHistorySaved = false })
+    Text("Recorta el inicio y el final de esta canción antes de exportar.", color = Color.Gray, fontSize = 9.sp)
+   }
   }
   Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
    Text("DURACIÓN DE CADA FOTO", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
