@@ -192,6 +192,7 @@ private fun EditorScreen() {
  var previewVolumeHistorySaved by remember { mutableStateOf(false) }
  var exportVolumeHistorySaved by remember { mutableStateOf(false) }
  var trackVolumeHistorySaved by remember { mutableStateOf(false) }
+ var audioOffsetHistorySaved by remember { mutableStateOf(false) }
  var audioTrimHistorySaved by remember { mutableStateOf(false) }
  var photoDurationHistorySaved by remember { mutableStateOf(false) }
  var transitionHistorySaved by remember { mutableStateOf(false) }
@@ -849,6 +850,17 @@ private fun EditorScreen() {
     onValueChangeFinished = { trackVolumeHistorySaved = false }
    )
    Text("Selecciona una pista de audio en la línea de tiempo para ajustar su volumen por separado.", color = Color.Gray, fontSize = 9.sp)
+   val trackOffsetMs = audioTrackOffsetsMs[selectedAudio.uri] ?: 0L
+   Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+    Text("INICIO DE LA PISTA EN EL MONTAJE", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+    Spacer(Modifier.weight(1f))
+    Text(trackOffsetMs.toString() + " ms", color = Accent, fontSize = 11.sp)
+   }
+   Slider(value = trackOffsetMs.toFloat(), onValueChange = { value ->
+    if (!audioOffsetHistorySaved) { saveTimelineState(); audioOffsetHistorySaved = true }
+    audioTrackOffsetsMs[selectedAudio.uri] = value.toLong().coerceIn(0L, 600000L)
+   }, valueRange = 0f..600000f, modifier = Modifier.fillMaxWidth(), onValueChangeFinished = { audioOffsetHistorySaved = false })
+   Text("La pista comenzará en el segundo indicado al exportar. La previsualización sincronizada del montaje completo aún está pendiente.", color = Color.Gray, fontSize = 9.sp)
    if (selectedAudio.durationMs > 0L) {
     val audioRange = audioTrimRanges[selectedAudio.uri] ?: (0L to selectedAudio.durationMs)
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -993,6 +1005,9 @@ private fun EditorScreen() {
    if (audioTrack.isEmpty()) Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { Text("Agrega una canción o pista de audio", color = Color.Gray, fontSize = 10.sp) }
    audioTrack.forEachIndexed { index, clip ->
     val blockWidth = ((clip.durationMs / 1000f) * 13f).coerceIn(90f, 240f)
+    val offsetWidth = ((audioTrackOffsetsMs[clip.uri] ?: 0L) / 1000f * 13f).coerceIn(0f, 240f)
+    Row(verticalAlignment = Alignment.CenterVertically) {
+    Spacer(Modifier.width(offsetWidth.dp))
     Row(Modifier.width(blockWidth.dp).fillMaxHeight().background(if (selected?.uri == clip.uri) Color(0xFF205D4A) else Color(0xFF174735), RoundedCornerShape(6.dp)).clickable { selected = clip }.padding(horizontal = 7.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
      Icon(Icons.Default.MusicNote, null, tint = Color(0xFF9AF0C8), modifier = Modifier.size(18.dp))
      Spacer(Modifier.width(5.dp))
@@ -1000,6 +1015,7 @@ private fun EditorScreen() {
       Text("${index + 1}. ${clip.name}", color = Color.White, fontSize = 9.sp, maxLines = 1)
       Text("${"%.1f".format(clip.durationMs / 1000f)} s • ${((audioTrackVolumes[clip.uri] ?: 1f) * 100).toInt()}%", color = Color(0xFFB6E8D2), fontSize = 8.sp)
      }
+    }
     }
    }
   }
