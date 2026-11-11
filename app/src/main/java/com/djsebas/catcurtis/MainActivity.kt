@@ -158,6 +158,7 @@ private fun EditorScreen() {
  val context = LocalContext.current
  val clips = remember { mutableStateListOf<Clip>() }
  var projectRestored by remember { mutableStateOf(false) }
+ var editorOpened by remember { mutableStateOf(false) }
  val thumbnails = remember { mutableStateMapOf<Uri, Bitmap>() }
  val undoHistory = remember { mutableStateListOf<EditorSnapshot>() }
  val redoHistory = remember { mutableStateListOf<EditorSnapshot>() }
@@ -241,7 +242,7 @@ private fun EditorScreen() {
   }
  }
  val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
-  if (uris.isNotEmpty()) saveTimelineState()
+  if (uris.isNotEmpty()) { editorOpened = true; saveTimelineState() }
   uris.forEach { uri ->
    runCatching { context.contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }
    val mime = context.contentResolver.getType(uri).orEmpty()
@@ -347,6 +348,7 @@ private fun EditorScreen() {
     }
     clips.clear()
     clips.addAll(restoredClips)
+    if (restoredClips.isNotEmpty()) editorOpened = true
     val selectedText = json.optString("selectedUri")
     val selectedUri = selectedText.takeIf { it.isNotBlank() && it != "null" }?.let { Uri.parse(it) }
     selected = clips.firstOrNull { it.uri == selectedUri } ?: clips.firstOrNull { it.kind == "VIDEO" || it.kind == "FOTO" }
@@ -644,16 +646,32 @@ private fun EditorScreen() {
   }
  }
 
- Column(Modifier.fillMaxSize().background(Bg).verticalScroll(rememberScrollState()).padding(14.dp)) {
+ if (!editorOpened) {
+  HomeScreen(
+   onNewProject = { picker.launch(arrayOf("video/*", "image/*", "audio/*")) },
+   onOpenLibrary = { picker.launch(arrayOf("video/*", "image/*", "audio/*")) }
+  )
+  return
+ }
+ Column(Modifier.fillMaxSize().background(Bg).verticalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 10.dp)) {
   Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-   Column(Modifier.weight(1f)) { Text("DJ SEBAS", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Black); Text("EDICIÓN CATCURTIS", color = Accent, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp) }
+   Column(Modifier.weight(1f)) { Text("CATCURTIS", color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.Black); Text("ESTUDIO DE EDICIÓN • ${clips.size} MEDIOS", color = Color(0xFFB9A8C8), fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp) }
    Button(onClick = { exportVideo() }, enabled = !exporting, colors = ButtonDefaults.buttonColors(containerColor = Accent)) {
     if (exporting) CircularProgressIndicator(Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp) else Icon(Icons.Default.SaveAlt, null)
     Spacer(Modifier.width(5.dp)); Text(if (exporting) "Exportando" else "Exportar proyecto")
    }
   }
-  Spacer(Modifier.height(12.dp))
-  Box(Modifier.fillMaxWidth().height(220.dp).background(Color.Black, RoundedCornerShape(18.dp)), contentAlignment = Alignment.Center) {
+  Spacer(Modifier.height(10.dp))
+  Row(Modifier.fillMaxWidth().background(Color(0xFF171720), RoundedCornerShape(12.dp)).padding(horizontal = 6.dp, vertical = 4.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+   listOf("Editar" to Icons.Default.ContentCut, "Audio" to Icons.Default.MusicNote, "Texto" to Icons.Default.TextFields, "Efectos" to Icons.Default.AutoAwesome, "Capas" to Icons.Default.Layers).forEach { (label, icon) ->
+    Column(Modifier.clickable { status = when(label) { "Audio" -> "Selecciona una pista de audio en la línea de tiempo"; "Texto" -> "Usa el panel de texto para editar el título"; "Efectos" -> "Selecciona un clip para aplicar filtros y movimiento"; "Capas" -> "Las pistas visuales y de audio aparecen en la línea de tiempo"; else -> "Selecciona un clip para editarlo" } }.padding(horizontal = 8.dp, vertical = 5.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+     Icon(icon, null, tint = Accent, modifier = Modifier.size(19.dp))
+     Text(label, color = Color.White, fontSize = 9.sp)
+    }
+   }
+  }
+  Spacer(Modifier.height(10.dp))
+  Box(Modifier.fillMaxWidth().height(245.dp).background(Color.Black, RoundedCornerShape(18.dp)), contentAlignment = Alignment.Center) {
    when (selected?.kind) {
     "VIDEO" -> AndroidView(factory = { PlayerView(it).apply { this.player = player; useController = true } }, modifier = Modifier.fillMaxSize())
     "FOTO" -> {
@@ -733,6 +751,14 @@ private fun EditorScreen() {
    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("Inicio ${"%.1f".format(trimStart/1000f)} s", color = Color.LightGray, fontSize = 10.sp); Text("Fin ${"%.1f".format(trimEnd/1000f)} s", color = Color.LightGray, fontSize = 10.sp) }
   } else Text("Selecciona un video para ajustar inicio y fin", color = Color.Gray, fontSize = 10.sp)
   Spacer(Modifier.height(9.dp))
+  Text("HERRAMIENTAS DE EDICIÓN", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+  Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+   ToolButton("Dividir", Icons.Default.CallSplit) { status = "Selecciona un punto de corte en el clip para dividirlo" }
+   ToolButton("Animación", Icons.Default.Animation) { status = if (selected?.kind == "FOTO") "Elige un movimiento de fotografía en el panel de animación" else "Selecciona una fotografía para animarla" }
+   ToolButton("Filtros", Icons.Default.Filter) { status = "Selecciona un filtro en el panel de filtros" }
+   ToolButton("Texto", Icons.Default.TextFields) { status = "Edita el título en el panel de texto" }
+   ToolButton("Audio", Icons.Default.MusicNote) { picker.launch(arrayOf("audio/*")) }
+  }
   Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
    Text("HERRAMIENTAS", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
    Spacer(Modifier.weight(1f))
@@ -1000,6 +1026,57 @@ private fun EditorScreen() {
   }
   Spacer(Modifier.height(7.dp)); Text(status, color = Color(0xFFB9A8C8), fontSize = 10.sp, maxLines = 2)
   Text("Exportación: clips en orden, música en bucle, título y filtro seleccionados. Recorte aplicado al video seleccionado.", color = Color.Gray, fontSize = 9.sp, maxLines = 2)
+ }
+}
+
+@Composable
+private fun HomeScreen(onNewProject: () -> Unit, onOpenLibrary: () -> Unit) {
+ Column(Modifier.fillMaxSize().background(Color(0xFF09090F)).verticalScroll(rememberScrollState()).padding(22.dp), horizontalAlignment = Alignment.Start) {
+  Spacer(Modifier.height(30.dp))
+  Text("DJ SEBAS", color = Color(0xFFB64CFF), fontSize = 13.sp, fontWeight = FontWeight.Black, letterSpacing = 3.sp)
+  Text("CATCURTIS", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.Black)
+  Text("ESTUDIO CREATIVO DE VIDEO", color = Color(0xFFB7B7C4), fontSize = 11.sp, letterSpacing = 2.sp)
+  Spacer(Modifier.height(34.dp))
+  Box(Modifier.fillMaxWidth().height(190.dp).background(Color(0xFF191322), RoundedCornerShape(24.dp)).padding(20.dp), contentAlignment = Alignment.CenterStart) {
+   Column {
+    Text("CUENTA TU HISTORIA", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+    Spacer(Modifier.height(7.dp))
+    Text("Edita videos, combina fotos y música, añade efectos y crea tu propio montaje.", color = Color(0xFFD2C8DD), fontSize = 13.sp)
+    Spacer(Modifier.height(14.dp))
+    Button(onClick = onNewProject, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB64CFF)), shape = RoundedCornerShape(12.dp)) {
+     Icon(Icons.Default.Add, null); Spacer(Modifier.width(7.dp)); Text("Nuevo proyecto", fontWeight = FontWeight.Bold)
+    }
+   }
+  }
+  Spacer(Modifier.height(28.dp))
+  Text("CREAR", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+  Spacer(Modifier.height(10.dp))
+  Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+   HomeActionCard("Nuevo proyecto", "Fotos y videos", Icons.Default.VideoLibrary, onNewProject, Modifier.weight(1f))
+   HomeActionCard("Añadir música", "Pistas de audio", Icons.Default.MusicNote, onOpenLibrary, Modifier.weight(1f))
+  }
+  Spacer(Modifier.height(22.dp))
+  Text("HERRAMIENTAS DEL ESTUDIO", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+  Spacer(Modifier.height(10.dp))
+  listOf("Edición multipista" to "Organiza videos, fotos y audio en tu línea de tiempo", "Filtros y transiciones" to "Aplica estilos visuales y fundidos", "Movimiento de fotografías" to "Crea paneos y acercamientos animados", "Exportación MP4" to "Guarda tu montaje en el teléfono").forEach { (title, desc) ->
+   Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+    Box(Modifier.size(38.dp).background(Color(0xFF21172D), RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) { Icon(Icons.Default.CheckCircle, null, tint = Color(0xFFB64CFF)) }
+    Spacer(Modifier.width(11.dp))
+    Column { Text(title, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold); Text(desc, color = Color.Gray, fontSize = 10.sp) }
+   }
+  }
+  Spacer(Modifier.height(20.dp))
+  Text("DJ SEBAS • CATCURTIS 1.40", color = Color(0xFF777783), fontSize = 10.sp)
+ }
+}
+
+@Composable
+private fun HomeActionCard(title: String, subtitle: String, icon: androidx.compose.ui.graphics.vector.ImageVector, action: () -> Unit, modifier: Modifier = Modifier) {
+ Column(modifier.background(Color(0xFF171720), RoundedCornerShape(16.dp)).clickable { action() }.padding(14.dp)) {
+  Icon(icon, null, tint = Color(0xFFB64CFF), modifier = Modifier.size(27.dp))
+  Spacer(Modifier.height(12.dp))
+  Text(title, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+  Text(subtitle, color = Color.Gray, fontSize = 10.sp)
  }
 }
 
