@@ -63,6 +63,7 @@ import androidx.media3.effect.OverlayEffect
 import androidx.media3.effect.StaticOverlaySettings
 import androidx.media3.effect.TextOverlay
 import androidx.media3.effect.RgbFilter
+import androidx.media3.effect.RgbMatrix
 import androidx.media3.transformer.ExportException
 import androidx.media3.transformer.ExportResult
 import androidx.media3.transformer.Transformer
@@ -185,7 +186,7 @@ private fun EditorScreen() {
    runCatching { context.contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }
    val mime = context.contentResolver.getType(uri).orEmpty()
    val kind = when { mime.startsWith("video") -> "VIDEO"; mime.startsWith("audio") -> "AUDIO"; mime.startsWith("image") -> "FOTO"; else -> "ARCHIVO" }
-   val duration = if (kind == "VIDEO") runCatching {
+   val duration = if (kind == "VIDEO" || kind == "AUDIO") runCatching {
     val retriever = MediaMetadataRetriever()
     try { retriever.setDataSource(context, uri); retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L }
     finally { retriever.release() }
@@ -195,7 +196,8 @@ private fun EditorScreen() {
    if (kind == "VIDEO") videoTrimRanges[uri] = 0L to duration.coerceAtLeast(1L)
    if (selected == null && (kind == "VIDEO" || kind == "FOTO")) { selected = clip; trimStart = 0f; trimEnd = if (kind == "VIDEO") duration.coerceAtLeast(1L).toFloat() else 1f }
   }
-  status = if (uris.isEmpty()) "No se seleccionaron archivos" else "${uris.size} archivo(s) agregados"
+  val audioDuration = clips.firstOrNull { it.kind == "AUDIO" && it.durationMs > 0L }?.durationMs ?: 0L
+  status = if (uris.isEmpty()) "No se seleccionaron archivos" else if (audioDuration > 0L && clips.any { it.kind == "FOTO" } && clips.filter { it.kind == "VIDEO" || it.kind == "FOTO" }.all { it.kind == "FOTO" }) "Audio detectado: las fotos se ajustarán automáticamente a ${"%.1f".format(audioDuration / 1000f)} s al exportar" else "${uris.size} archivo(s) agregados"
  }
  LaunchedEffect(clips.map { it.uri }) {
   val loaded = withContext(Dispatchers.IO) {
@@ -352,8 +354,10 @@ private fun EditorScreen() {
   status = "Preparando ${visualClips.size} clip(s) de video/foto… no cierres la aplicación"
   val output = File(context.cacheDir, "catcurtis_${System.currentTimeMillis()}.mp4")
   val sequenceItems = mutableListOf<EditedMediaItem>()
+  val audioDurationMs = clips.firstOrNull { it.kind == "AUDIO" && it.durationMs > 0L }?.durationMs ?: 0L
+  val autoPhotoDurationMs = if (audioDurationMs > 0L && visualClips.isNotEmpty() && visualClips.all { it.kind == "FOTO" }) (audioDurationMs / visualClips.size).coerceAtLeast(1L) else (photoDurationSeconds * 1000f).toLong().coerceAtLeast(1L)
   val clipDurationsMs = visualClips.map { video ->
-   if (video.kind == "FOTO") (photoDurationSeconds * 1000f).toLong().coerceAtLeast(1L)
+   if (video.kind == "FOTO") autoPhotoDurationMs
    else {
     val range = videoTrimRanges[video.uri] ?: (0L to video.durationMs)
     (range.second - range.first).coerceAtLeast(1L)
@@ -366,7 +370,7 @@ private fun EditorScreen() {
   var timelineEndMs = 0L
   visualClips.forEachIndexed { index, video ->
    val mediaBuilder = MediaItem.Builder().setUri(video.uri)
-   if (video.kind == "FOTO") mediaBuilder.setImageDurationMs((photoDurationSeconds * 1000f).toLong())
+   if (video.kind == "FOTO") mediaBuilder.setImageDurationMs(autoPhotoDurationMs)
    if (video.kind == "VIDEO") {
     val range = videoTrimRanges[video.uri] ?: (0L to video.durationMs)
     mediaBuilder.setClippingConfiguration(
@@ -374,9 +378,10 @@ private fun EditorScreen() {
     )
    }
    val editedBuilder = EditedMediaItem.Builder(mediaBuilder.build())
-   val videoEffects = when (filterMode) {
+   val videoEffects: List<androidx.media3.common.Effect> = when (filterMode) {
     "Blanco y negro" -> listOf(RgbFilter.createGrayscaleFilter())
     "Negativo" -> listOf(RgbFilter.createInvertedFilter())
+    "Sepia" -> listOf(RgbMatrix { _, _ -> floatArrayOf(0.393f,0.349f,0.272f,0f,0.769f,0.686f,0.534f,0f,0.189f,0.168f,0.131f,0f,0f,0f,0f,1f) })
     else -> emptyList()
    }
    val overlays = if (titleText.isNotBlank()) {
@@ -492,7 +497,13 @@ private fun EditorScreen() {
        bitmap = photoBitmap.asImageBitmap(),
        contentDescription = "Vista previa de la fotografía seleccionada",
        modifier = Modifier.fillMaxSize(),
-       contentScale = androidx.compose.ui.layout.ContentScale.Fit
+       contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+       colorFilter = when (filterMode) {
+        "Blanco y negro" -> androidx.compose.ui.graphics.ColorFilter.colorMatrix(androidx.compose.ui.graphics.ColorMatrix(floatArrayOf(0.213f,0.715f,0.072f,0f,0f,0.213f,0.715f,0.072f,0f,0f,0.213f,0.715f,0.072f,0f,0f,0f,0f,0f,1f,0f)))
+        "Negativo" -> androidx.compose.ui.graphics.ColorFilter.colorMatrix(androidx.compose.ui.graphics.ColorMatrix(floatArrayOf(-1f,0f,0f,0f,255f,0f,-1f,0f,0f,255f,0f,0f,-1f,0f,255f,0f,0f,0f,1f,0f)))
+        "Sepia" -> androidx.compose.ui.graphics.ColorFilter.colorMatrix(androidx.compose.ui.graphics.ColorMatrix(floatArrayOf(0.393f,0.769f,0.189f,0f,0f,0.349f,0.686f,0.168f,0f,0f,0.272f,0.534f,0.131f,0f,0f,0f,0f,0f,1f,0f)))
+        else -> null
+       }
       )
      } else {
       Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -570,7 +581,7 @@ private fun EditorScreen() {
   Spacer(Modifier.height(10.dp))
   Text("FILTRO DE VIDEO", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
   Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-   listOf("Original", "Blanco y negro", "Negativo").forEach { option ->
+   listOf("Original", "Blanco y negro", "Negativo", "Sepia").forEach { option ->
     FilterChip(
      selected = filterMode == option,
      onClick = { if (filterMode != option) { saveTimelineState(); filterMode = option } },
@@ -624,7 +635,8 @@ private fun EditorScreen() {
    modifier = Modifier.fillMaxWidth(),
    onValueChangeFinished = { photoDurationHistorySaved = false }
   )
-  Text("Elige cuánto tiempo aparece cada fotografía al exportar.", color = Color.Gray, fontSize = 9.sp)
+  val hasAutoPhotoAudio = clips.any { it.kind == "AUDIO" && it.durationMs > 0L } && clips.any { it.kind == "FOTO" } && clips.filter { it.kind == "VIDEO" || it.kind == "FOTO" }.all { it.kind == "FOTO" }
+  Text(if (hasAutoPhotoAudio) "AJUSTE AUTOMÁTICO ACTIVO: la duración total de las fotos coincidirá con la duración de la música." else "Elige cuánto tiempo aparece cada fotografía al exportar. Importa una canción para ajustar automáticamente la duración de tus fotos.", color = if (hasAutoPhotoAudio) Accent else Color.Gray, fontSize = 9.sp)
   Text("TÍTULO SOBRE EL VIDEO", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
   OutlinedTextField(
    value = titleText,
