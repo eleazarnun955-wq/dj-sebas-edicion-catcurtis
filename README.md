@@ -1,32 +1,47 @@
 # DJ SEBAS EDICIÓN CATCURTIS
 
-Android video editor project inspired by modern mobile editors.
+Editor de video Android independiente, con interfaz oscura y herramientas locales de montaje.
 
-## Build
+## Estado actual
 
-Open with Android Studio or run `./gradlew assembleDebug`.
+Versión de código: **1.24.0**  
+Paquete Android: `com.djsebas.catcurtis`  
+SDK mínimo: Android 8.0 (API 26)  
+Compilación: GitHub Actions genera un APK de depuración.
 
-The GitHub Actions workflow builds a debug APK and publishes it as an artifact.
+## Funciones implementadas en el código
 
-## Current features (1.3.0)
+- Importación múltiple de videos, fotografías y pistas de audio mediante el selector de archivos de Android.
+- Permisos persistentes de lectura para los medios importados.
+- Vista previa de video con ExoPlayer y vista previa de fotografías.
+- Miniaturas de los medios visuales.
+- Línea de tiempo/lista de medios con selección, reordenamiento y eliminación.
+- Recorte de inicio y fin de cada video mediante controles de rango.
+- Duración ajustable de fotografías (1 a 15 segundos).
+- Transición de fundido cruzado de hasta 0.5 segundos durante la exportación.
+- Filtros de video: original, blanco y negro y negativo.
+- Título superpuesto con texto editable, cinco colores, tamaño ajustable (50 % a 200 %) y posición vertical.
+- Historial Deshacer/Rehacer de hasta 30 estados para los ajustes admitidos.
+- Mezcla de varias pistas de audio en bucle, con volumen general y volumen individual.
+- Control de volumen independiente para la vista previa.
+- Exportación MP4 a `Películas/DJ SEBAS CATCURTIS`.
 
-- Dark editing-studio interface
-- Import multiple videos, photos and audio files using Android's system picker
-- Media bin and ordered timeline list with move-up/move-down controls
-- Preview of the selected video
-- Start/end trimming for the selected video
-- Sequential export of video clips and still photos in timeline order
-- Each photo is rendered for five seconds in the exported MP4
-- The selected video's trim range is applied during project export
-- The first imported audio file is mixed as a looping background soundtrack until the visual montage ends
-- Export saved under `Movies/DJ SEBAS CATCURTIS`
+## Pendiente de validación o desarrollo
 
-## Still pending
+- Pruebas completas de exportación con combinaciones reales de videos, fotos y varias pistas de audio.
+- Verificación en un teléfono físico Android, incluyendo el Moto G24 del usuario.
+- Persistencia y recuperación de proyectos/drafts después de cerrar la aplicación.
+- Fotogramas clave, animación avanzada, subtítulos automáticos, control de velocidad y biblioteca ampliada de efectos/transiciones.
+- Verificar en dispositivo el rendimiento, compatibilidad de códecs y estabilidad con archivos largos.
 
-- True multi-track timeline and drag-and-drop clip reordering
-- Text, titles, stickers, transitions, filters and visual effects
-- Undo/redo, speed controls, keyframes and advanced audio controls
+## Compilar
 
-Photos are currently exported as five-second still-image segments. The first imported audio file is used as a looping soundtrack during export; additional independent audio tracks and volume automation remain pending.
+Con Android Studio o mediante GitHub Actions, ejecutar:
 
-This is an independent application package: `com.djsebas.catcurtis`.
+```bash
+gradle assembleDebug --no-daemon
+```
+
+El APK de depuración se publica como artefacto del flujo de trabajo **Android APK**.
+
+**Importante:** una compilación exitosa confirma que el código compila; no sustituye las pruebas de reproducción y exportación en un dispositivo real.
